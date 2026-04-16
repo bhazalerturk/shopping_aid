@@ -154,7 +154,7 @@ private fun DrawScope.drawStoreLayout(targetCorsie: Set<Int>) {
         marginLeft + 4f,
         h * 0.98f,
         android.graphics.Paint().apply {
-            color = android.graphics.Color.DKGRAY
+            this.color = android.graphics.Color.DKGRAY
             textSize = 24f
         }
     )
@@ -213,7 +213,7 @@ private fun DrawScope.drawStoreLayout(targetCorsie: Set<Int>) {
             aisleLeft + aisleW / 2 - 12f,
             aisleAreaTop + aisleAreaH / 2,
             android.graphics.Paint().apply {
-                color = if (isHighlighted) android.graphics.Color.parseColor("#E65100")
+                this.color = if (isHighlighted) android.graphics.Color.parseColor("#E65100")
                 else android.graphics.Color.parseColor("#1565C0")
                 textSize = 28f
                 isFakeBoldText = isHighlighted
@@ -278,7 +278,7 @@ private fun DrawScope.drawSection(
             left + 4f,
             top + 28f + idx * 26f,
             android.graphics.Paint().apply {
-                color = android.graphics.Color.DKGRAY
+                this.color = android.graphics.Color.DKGRAY
                 textSize = 22f
             }
         )
