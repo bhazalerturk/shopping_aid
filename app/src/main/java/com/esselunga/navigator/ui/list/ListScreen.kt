@@ -1,6 +1,9 @@
 package com.esselunga.navigator.ui.list
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,38 +24,145 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.esselunga.navigator.data.ProductCategory
 import com.esselunga.navigator.data.ShoppingItem
+import com.esselunga.navigator.data.StoreSection
+import com.esselunga.navigator.data.findCategory
+import com.esselunga.navigator.util.BudgetCalculator
+import com.esselunga.navigator.util.BudgetStatus
 import com.esselunga.navigator.viewmodel.ShoppingViewModel
+import kotlinx.coroutines.launch
 
-private val EsselungaGreen = Color(0xFF00843D)
-private val UnknownOrange = Color(0xFFF57C00)
+private val EasylungaGreen = Color(0xFF00843D)
+private val WarningYellow = Color(0xFFF9A825)
+private val DangerRed = Color(0xFFD32F2F)
+
+// Fun color per category section
+private fun sectionColor(section: StoreSection?): Color = when (section) {
+    StoreSection.PRODUCE      -> Color(0xFF43A047)
+    StoreSection.BAKERY       -> Color(0xFFFF8F00)
+    StoreSection.PASTA_RICE   -> Color(0xFFFBC02D)
+    StoreSection.CONDIMENTS   -> Color(0xFF8E24AA)
+    StoreSection.DAIRY        -> Color(0xFF0288D1)
+    StoreSection.DELI         -> Color(0xFFD81B60)
+    StoreSection.MEAT         -> Color(0xFFE53935)
+    StoreSection.FROZEN       -> Color(0xFF00ACC1)
+    StoreSection.BREAKFAST    -> Color(0xFFFF7043)
+    StoreSection.DRINKS       -> Color(0xFF1E88E5)
+    StoreSection.PERSONAL_CARE-> Color(0xFF7B1FA2)
+    StoreSection.CLEANING     -> Color(0xFF546E7A)
+    StoreSection.PET          -> Color(0xFF6D4C41)
+    null                      -> Color(0xFFF57C00)
+}
+
+private fun sectionEmoji(section: StoreSection?): String = when (section) {
+    StoreSection.PRODUCE      -> "🥦"
+    StoreSection.BAKERY       -> "🍞"
+    StoreSection.PASTA_RICE   -> "🍝"
+    StoreSection.CONDIMENTS   -> "🫙"
+    StoreSection.DAIRY        -> "🥛"
+    StoreSection.DELI         -> "🥩"
+    StoreSection.MEAT         -> "🍗"
+    StoreSection.FROZEN       -> "🧊"
+    StoreSection.BREAKFAST    -> "🥣"
+    StoreSection.DRINKS       -> "🥤"
+    StoreSection.PERSONAL_CARE-> "🧴"
+    StoreSection.CLEANING     -> "🧹"
+    StoreSection.PET          -> "🐾"
+    null                      -> "❓"
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ListScreen(
     viewModel: ShoppingViewModel,
-    onStartNavigation: () -> Unit
+    onStartNavigation: () -> Unit,
+    onReview: () -> Unit,
+    onAddWithWizard: () -> Unit
 ) {
     val items by viewModel.items.collectAsState()
-    var inputText by remember { mutableStateOf("") }
+    val budget by viewModel.budget.collectAsState()
+    val totalCost by viewModel.totalCostFlow.collectAsState()
+    val days by viewModel.wizardDays.collectAsState()
+    val people by viewModel.wizardPeople.collectAsState()
+    val wizardActive = days > 1 || people > 1
 
-    fun submit() {
-        viewModel.addItem(inputText)
+    var inputText by remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    // Live preview of recognized product as user types
+    val previewCategory: ProductCategory? = remember(inputText) {
+        if (inputText.length >= 2) findCategory(inputText) else null
+    }
+    val previewSuggestedQty: Int? = remember(previewCategory, days, people) {
+        previewCategory?.let { viewModel.getSuggestedQuantity(it) }
+    }
+
+    val budgetStatus = BudgetCalculator.budgetStatus(totalCost, budget)
+    val progressColor by animateColorAsState(
+        targetValue = when (budgetStatus) {
+            BudgetStatus.OVER    -> DangerRed
+            BudgetStatus.WARNING -> WarningYellow
+            else                 -> EasylungaGreen
+        },
+        animationSpec = tween(400), label = "budgetColor"
+    )
+
+    val checkedCount = items.count { it.checked }
+    val totalCount = items.size
+
+    fun tryAddItem(text: String, qty: Int = 0) {
+        if (text.isBlank()) return
+        val category = findCategory(text)
+        val finalQty = if (qty > 0) qty else (category?.let { viewModel.getSuggestedQuantity(it) } ?: 1)
+        val itemCost = (category?.defaultPrice ?: 0.0) * finalQty
+
+        if (budget > 0 && viewModel.wouldExceedBudget(itemCost)) {
+            scope.launch {
+                snackbarHostState.showSnackbar(
+                    "🚫 Can't add — only ${BudgetCalculator.formatEuro(viewModel.budgetRemaining)} left in budget!"
+                )
+            }
+            return
+        }
+        viewModel.addItem(text)
         inputText = ""
     }
 
     Scaffold(
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = DangerRed,
+                    contentColor = Color.White,
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+        },
         topBar = {
             TopAppBar(
-                title = { Text("Lista della spesa", fontWeight = FontWeight.Bold) },
+                title = {
+                    Column {
+                        Text("My Shopping List", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        if (totalCount > 0) {
+                            Text(
+                                "🎯 $checkedCount / $totalCount items found",
+                                fontSize = 12.sp,
+                                color = Color.White.copy(alpha = 0.85f)
+                            )
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EsselungaGreen,
+                    containerColor = EasylungaGreen,
                     titleContentColor = Color.White
                 ),
                 actions = {
                     if (items.isNotEmpty()) {
                         TextButton(onClick = { viewModel.clearAll() }) {
-                            Text("Svuota", color = Color.White)
+                            Text("Clear all", color = Color.White, fontSize = 15.sp)
                         }
                     }
                 }
@@ -63,9 +173,102 @@ fun ListScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color.White)
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                // Budget bar — always reactive
+                if (budget > 0) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                "${BudgetCalculator.formatEuro(totalCost)} / ${BudgetCalculator.formatEuro(budget)}",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = progressColor
+                            )
+                            Text(
+                                when (budgetStatus) {
+                                    BudgetStatus.OVER    -> "🔴 Over budget!"
+                                    BudgetStatus.WARNING -> "🟡 Almost at limit"
+                                    BudgetStatus.NOT_SET -> ""
+                                    else                 -> "🟢 ${BudgetCalculator.formatEuro(viewModel.budgetRemaining)} left"
+                                },
+                                fontSize = 13.sp,
+                                color = progressColor,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        LinearProgressIndicator(
+                            progress = { viewModel.budgetProgress },
+                            modifier = Modifier.fillMaxWidth().height(12.dp),
+                            color = progressColor,
+                            trackColor = Color(0xFFE0E0E0)
+                        )
+                    }
+                }
+
+                // Product preview card — shows when text matches a product
+                if (previewCategory != null) {
+                    val color = sectionColor(previewCategory.section)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.10f)),
+                        border = CardDefaults.outlinedCardBorder().copy(
+                            width = 1.5.dp
+                        )
+                    ) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .border(1.5.dp, color.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(sectionEmoji(previewCategory.section), fontSize = 32.sp)
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    previewCategory.displayNameEn,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = color
+                                )
+                                Text(
+                                    "Aisle ${previewCategory.corsia} · ${BudgetCalculator.formatEuro(previewCategory.defaultPrice)} each",
+                                    fontSize = 12.sp,
+                                    color = Color.Gray
+                                )
+                                if (wizardActive && previewSuggestedQty != null && previewSuggestedQty > 1) {
+                                    Text(
+                                        "💡 We suggest $previewSuggestedQty for $people ${if (people == 1) "person" else "people"}, $days ${if (days == 1) "day" else "days"}",
+                                        fontSize = 12.sp,
+                                        color = EasylungaGreen,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                            Button(
+                                onClick = { tryAddItem(inputText, previewSuggestedQty ?: 1) },
+                                colors = ButtonDefaults.buttonColors(containerColor = color),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    if (wizardActive && (previewSuggestedQty ?: 1) > 1)
+                                        "Add ${previewSuggestedQty}x"
+                                    else "Add",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // Input row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -76,63 +279,112 @@ fun ListScreen(
                         value = inputText,
                         onValueChange = { inputText = it },
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("Aggiungi prodotto…") },
+                        placeholder = { Text("Type a product…", fontSize = 17.sp) },
                         singleLine = true,
+                        textStyle = LocalTextStyle.current.copy(fontSize = 18.sp),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = { submit() }),
+                        keyboardActions = KeyboardActions(onDone = { tryAddItem(inputText) }),
                         shape = RoundedCornerShape(12.dp)
                     )
                     IconButton(
-                        onClick = { submit() },
-                        colors = IconButtonDefaults.iconButtonColors(containerColor = EsselungaGreen)
+                        onClick = { tryAddItem(inputText) },
+                        modifier = Modifier.size(56.dp),
+                        colors = IconButtonDefaults.iconButtonColors(containerColor = EasylungaGreen)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "Aggiungi", tint = Color.White)
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Add",
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
                     }
                 }
 
-                // Start navigation button
+                // Action buttons
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = onAddWithWizard,
+                        modifier = Modifier.weight(1f).height(52.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("🧙 Wizard", fontSize = 15.sp)
+                    }
+                    OutlinedButton(
+                        onClick = onReview,
+                        modifier = Modifier.weight(1f).height(52.dp),
+                        enabled = items.isNotEmpty(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("👤 Review", fontSize = 15.sp)
+                    }
+                }
+
                 Button(
                     onClick = onStartNavigation,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().height(60.dp),
                     enabled = items.any { !it.checked },
-                    colors = ButtonDefaults.buttonColors(containerColor = EsselungaGreen),
-                    shape = RoundedCornerShape(12.dp)
+                    colors = ButtonDefaults.buttonColors(containerColor = EasylungaGreen),
+                    shape = RoundedCornerShape(14.dp)
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null)
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(26.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Avvia navigazione", fontSize = 16.sp)
+                    Text("Start Shopping", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
     ) { paddingValues ->
         if (items.isEmpty()) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
+                modifier = Modifier.fillMaxSize().padding(paddingValues),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "Aggiungi prodotti alla lista\nper iniziare la navigazione",
-                    color = Color.Gray,
-                    fontSize = 15.sp,
-                    lineHeight = 22.sp
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("🛒", fontSize = 72.sp)
+                    Text("Your list is empty", color = Color.DarkGray, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text("Type a product above to get started", color = Color.LightGray, fontSize = 15.sp)
+                    if (!wizardActive) {
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedButton(onClick = onAddWithWizard, shape = RoundedCornerShape(12.dp)) {
+                            Text("🧙 Use the Wizard for suggestions")
+                        }
+                    }
+                }
             }
         } else {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(horizontal = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                contentPadding = PaddingValues(vertical = 12.dp)
+                    .padding(horizontal = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(vertical = 14.dp)
             ) {
                 items(items, key = { it.id }) { item ->
+                    val suggestedQty = item.category?.let { viewModel.getSuggestedQuantity(it) }
                     ShoppingItemRow(
                         item = item,
+                        budget = budget,
+                        totalCost = totalCost,
+                        suggestedQty = suggestedQty,
+                        wizardActive = wizardActive,
                         onToggle = { viewModel.toggleChecked(item.id) },
-                        onRemove = { viewModel.removeItem(item.id) }
+                        onRemove = { viewModel.removeItem(item.id) },
+                        onIncrement = {
+                            val addCost = item.priceEuro
+                            if (budget > 0 && viewModel.wouldExceedBudget(addCost)) {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        "🚫 Can't add more — only ${BudgetCalculator.formatEuro(viewModel.budgetRemaining)} left!"
+                                    )
+                                }
+                            } else {
+                                viewModel.incrementQuantity(item.id)
+                            }
+                        },
+                        onDecrement = { viewModel.decrementQuantity(item.id) }
                     )
                 }
             }
@@ -143,61 +395,149 @@ fun ListScreen(
 @Composable
 private fun ShoppingItemRow(
     item: ShoppingItem,
+    budget: Double,
+    totalCost: Double,
+    suggestedQty: Int?,
+    wizardActive: Boolean,
     onToggle: () -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    onIncrement: () -> Unit,
+    onDecrement: () -> Unit
 ) {
-    val bgColor = when {
-        item.checked -> Color(0xFFF5F5F5)
-        item.category == null -> Color(0xFFFFF3E0)
-        else -> Color.White
+    val color = sectionColor(item.category?.section)
+    val priceColor = when {
+        item.checked                                      -> Color.Gray
+        budget > 0 && totalCost > budget                  -> DangerRed
+        else                                              -> color
     }
-    val accentColor = when {
-        item.category == null -> UnknownOrange
-        else -> EsselungaGreen
+    val bgColor = when {
+        item.checked        -> Color(0xFFF5F5F5)
+        item.category == null -> Color(0xFFFFF3E0)
+        else                -> color.copy(alpha = 0.06f)
     }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = bgColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Checkbox(
-                checked = item.checked,
-                onCheckedChange = { onToggle() },
-                colors = CheckboxDefaults.colors(checkedColor = EsselungaGreen)
+        // Colored left stripe
+        Row(Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .width(5.dp)
+                    .height(IntrinsicSize.Min)
+                    .background(
+                        if (item.checked) Color.LightGray else color,
+                        RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp)
+                    )
+                    .defaultMinSize(minHeight = 72.dp)
             )
-            Spacer(Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.rawText,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 15.sp,
-                    textDecoration = if (item.checked) TextDecoration.LineThrough else null,
-                    color = if (item.checked) Color.Gray else Color.Black
-                )
-                if (item.category != null) {
+            Column(Modifier.fillMaxWidth().padding(10.dp, 10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Corsia ${item.category.corsia} · ${item.category.section.label}",
-                        fontSize = 12.sp,
-                        color = accentColor
+                        sectionEmoji(item.category?.section),
+                        fontSize = 26.sp,
+                        modifier = Modifier.padding(end = 8.dp)
                     )
-                } else {
-                    Text(
-                        text = "Prodotto non riconosciuto — chiedi al personale",
-                        fontSize = 12.sp,
-                        color = UnknownOrange
+                    Checkbox(
+                        checked = item.checked,
+                        onCheckedChange = { onToggle() },
+                        colors = CheckboxDefaults.colors(checkedColor = color),
+                        modifier = Modifier.size(28.dp)
                     )
+                    Spacer(Modifier.width(6.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = item.rawText,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            textDecoration = if (item.checked) TextDecoration.LineThrough else null,
+                            color = if (item.checked) Color.Gray else Color.Black
+                        )
+                        if (item.category != null) {
+                            Text(
+                                text = "Aisle ${item.category.corsia} · ${item.category.section.label}",
+                                fontSize = 12.sp,
+                                color = color
+                            )
+                        } else {
+                            Text(
+                                "Not recognized — ask staff",
+                                fontSize = 12.sp,
+                                color = Color(0xFFF57C00)
+                            )
+                        }
+                    }
+                    if (item.priceEuro > 0) {
+                        Text(
+                            BudgetCalculator.formatEuro(item.totalPrice),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = priceColor
+                        )
+                    }
+                    Spacer(Modifier.width(2.dp))
+                    IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Remove",
+                            tint = Color.LightGray,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
-            }
-            IconButton(onClick = onRemove) {
-                Icon(Icons.Default.Close, contentDescription = "Rimuovi", tint = Color.LightGray)
+
+                // Quantity row
+                if (!item.checked) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 68.dp, top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedIconButton(
+                            onClick = onDecrement,
+                            modifier = Modifier.size(34.dp),
+                            enabled = item.quantity > 1,
+                            border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.5.dp)
+                        ) {
+                            Text("−", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = color)
+                        }
+                        Text(
+                            "${item.quantity}",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = color,
+                            modifier = Modifier.widthIn(min = 28.dp)
+                        )
+                        OutlinedIconButton(
+                            onClick = onIncrement,
+                            modifier = Modifier.size(34.dp),
+                            border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.5.dp)
+                        ) {
+                            Text("+", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = color)
+                        }
+                        if (item.priceEuro > 0 && item.quantity > 1) {
+                            Text(
+                                "${BudgetCalculator.formatEuro(item.priceEuro)} each",
+                                fontSize = 12.sp,
+                                color = Color.Gray
+                            )
+                        }
+                        // Suggestion hint
+                        if (wizardActive && suggestedQty != null && suggestedQty != item.quantity) {
+                            Text(
+                                "💡 Suggested: $suggestedQty",
+                                fontSize = 12.sp,
+                                color = EasylungaGreen,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
             }
         }
     }
