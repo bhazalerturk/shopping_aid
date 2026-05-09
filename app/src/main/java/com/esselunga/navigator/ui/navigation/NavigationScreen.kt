@@ -74,7 +74,7 @@ fun NavigationScreen(
                     Text("Step ${currentStepIndex + 1} of ${route.size}", fontSize = 14.sp, color = Color.Gray)
                     if (budget > 0) {
                         Text(
-                            "Spent: ${BudgetCalculator.formatEuro(viewModel.totalCost)}",
+                            "Spent: ${BudgetCalculator.formatEuro(viewModel.totalCost.value)}",
                             fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = EasylungaGreen
                         )
                     }

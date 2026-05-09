@@ -84,7 +84,7 @@ fun ListScreen(
 ) {
     val items by viewModel.items.collectAsState()
     val budget by viewModel.budget.collectAsState()
-    val totalCost by viewModel.totalCostFlow.collectAsState()
+    val totalCost by viewModel.totalCost.collectAsState()
     val days by viewModel.wizardDays.collectAsState()
     val people by viewModel.wizardPeople.collectAsState()
     val wizardActive = days > 1 || people > 1

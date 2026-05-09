@@ -84,7 +84,13 @@ class ShoppingViewModel(application: Application) : AndroidViewModel(application
 
     fun decrementQuantity(id: String) {
         _items.update { list ->
-            list.map { if (it.id == id && it.quantity > 1) it.copy(quantity = it.quantity - 1) else it }
+            list.mapNotNull { item ->
+                when {
+                    item.id != id -> item
+                    item.quantity <= 1 -> null // 👈 elimina item
+                    else -> item.copy(quantity = item.quantity - 1)
+                }
+            }
         }
     }
 
@@ -96,12 +102,15 @@ class ShoppingViewModel(application: Application) : AndroidViewModel(application
     val unrecognizedItems: List<ShoppingItem> get() = _items.value.filter { it.product == null }
 
     // Reactive total cost — always in sync with items list
-    val totalCostFlow: StateFlow<Double> = _items
-        .map { list -> list.sumOf { it.priceEuro * it.quantity } }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
-
-    val totalCost: Double get() = totalCostFlow.value
-
+    val totalCost: StateFlow<Double> = _items
+        .map { list ->
+            list.sumOf { it.priceEuro * it.quantity }
+        }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            0.0
+        )
     // ── Budget ────────────────────────────────────────────────────────────────
     private val _budget = MutableStateFlow(0.0)
     val budget: StateFlow<Double> = _budget.asStateFlow()
@@ -110,18 +119,20 @@ class ShoppingViewModel(application: Application) : AndroidViewModel(application
         _budget.value = amount
     }
 
-    val budgetRemaining: Double get() = (_budget.value - totalCost).coerceAtLeast(0.0)
-    val budgetProgress: Float get() = BudgetCalculator.budgetProgress(totalCost, _budget.value)
+    val budgetRemaining: Double
+        get() = (_budget.value - totalCost.value).coerceAtLeast(0.0)
+    val budgetProgress: Float get() =
+        BudgetCalculator.budgetProgress(totalCost.value, _budget.value)
 
     /** Returns true if adding this item cost would push total over budget. */
     fun wouldExceedBudget(itemCost: Double): Boolean {
         if (_budget.value <= 0) return false
-        return totalCost + itemCost > _budget.value
+        return totalCost.value + itemCost > _budget.value
     }
 
     fun canAfford(price: Double): Boolean {
         if (_budget.value <= 0) return true
-        return totalCost + price <= _budget.value
+        return totalCost.value + price <= _budget.value
     }
 
     // ── Wizard ────────────────────────────────────────────────────────────────
@@ -141,8 +152,8 @@ class ShoppingViewModel(application: Application) : AndroidViewModel(application
                 warnings.add("You have ${item.quantity} x ${item.rawText} — are you sure?")
             }
         }
-        if (_budget.value > 0 && totalCost > _budget.value) {
-            warnings.add("Your list costs ${BudgetCalculator.formatEuro(totalCost)}, which is over your budget of ${BudgetCalculator.formatEuro(_budget.value)}.")
+        if (_budget.value > 0 && totalCost.value > _budget.value) {
+            warnings.add("Your list costs ${BudgetCalculator.formatEuro(totalCost.value)}, which is over your budget of ${BudgetCalculator.formatEuro(_budget.value)}.")
         }
         return warnings
     }
@@ -170,7 +181,8 @@ class ShoppingViewModel(application: Application) : AndroidViewModel(application
         for (item in _items.value) {
             sb.append("• ${item.rawText} x${item.quantity} — ${BudgetCalculator.formatEuro(item.totalPrice)}\n")
         }
-        sb.append("\nTotal: ${BudgetCalculator.formatEuro(totalCost)}")
+        val amount = totalCost.value
+        sb.append("\nTotal: ${BudgetCalculator.formatEuro(amount)}")
         if (_budget.value > 0) sb.append(" / ${BudgetCalculator.formatEuro(_budget.value)}")
         return sb.toString()
     }

@@ -20,6 +20,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.esselunga.navigator.util.BudgetCalculator
 import com.esselunga.navigator.viewmodel.ShoppingViewModel
+import com.esselunga.navigator.util.BudgetCalculator.totalCost
+
+
 
 private val EasylungaGreen = Color(0xFF00843D)
 
@@ -32,6 +35,7 @@ fun ReviewScreen(
 ) {
     val items by viewModel.items.collectAsState()
     val budget by viewModel.budget.collectAsState()
+    val totalCost by viewModel.totalCost.collectAsState()
     val caregiver by viewModel.caregiver.collectAsState()
     val context = LocalContext.current
 
@@ -80,9 +84,9 @@ fun ReviewScreen(
                         Column(horizontalAlignment = Alignment.End) {
                             Text("Total", fontSize = 13.sp, color = Color.Gray)
                             Text(
-                                BudgetCalculator.formatEuro(viewModel.totalCost),
+                                BudgetCalculator.formatEuro(totalCost),
                                 fontSize = 22.sp, fontWeight = FontWeight.Bold,
-                                color = if (budget > 0 && viewModel.totalCost > budget) Color.Red else EasylungaGreen
+                                color = if (budget > 0 && totalCost > budget) Color.Red else EasylungaGreen
                             )
                         }
                     }
