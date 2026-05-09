@@ -31,6 +31,7 @@ import com.esselunga.navigator.data.StoreSection
 import com.esselunga.navigator.util.BudgetCalculator
 import com.esselunga.navigator.util.BudgetStatus
 import com.esselunga.navigator.data.searchProducts
+import com.esselunga.navigator.data.getCategoryById
 import com.esselunga.navigator.viewmodel.ShoppingViewModel
 import kotlinx.coroutines.launch
 
@@ -233,7 +234,8 @@ fun ListScreen(
                                 ) {
                                     Column(Modifier.weight(1f)) {
                                         Text(product.name, fontWeight = FontWeight.Bold)
-                                        Text(product.categoryId, fontSize = 12.sp, color = Color.Gray)
+                                        Text(text = getCategoryById(product.categoryId)?.displayName ?: product.categoryId,
+                                            fontSize = 12.sp, color = Color.Gray)
                                     }
                                     Text("${product.price} €")
                                 }

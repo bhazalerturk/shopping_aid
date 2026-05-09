@@ -39,8 +39,7 @@ val CATEGORIES = listOf(
     Category("carne","Carne", StoreSection.MEAT, 1  ),
     Category("pesce_sushi","Pesce e Sushi", StoreSection.MEAT, 1  ),
     Category("formaggi","Formaggi", StoreSection.DAIRY, 1  ),
-    Category("latte","Latte", StoreSection.DAIRY, 1  ),
-    Category("yougurt_uova","Yogurt e Uova", StoreSection.DAIRY, 1  ),
+    Category("yougurt_uova","Latte Yogurt e Uova", StoreSection.DAIRY, 1  ),
     Category("pane","Pane", StoreSection.BAKERY, 1  ),
     Category("pasta_riso_sughi","Pasta, riso e sughi", StoreSection.PASTA_RICE, 1  ),
     Category("dispensa", "Dispensa", StoreSection.DISPENSA, corsia= 1),
@@ -572,9 +571,9 @@ val PRODUCTS = listOf(
     Product(id="Les Chateaux De France Brie 200 g",name="Les Chateaux De France Brie 200 g",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/721365.jpg",price =13.35,keywords = listOf(),categoryId = "formaggi",suggestedPerDay = 0.5),
     Product(id="Esselunga Feta DOP 200 g",name="Esselunga Feta DOP 200 g",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/721850.jpg",price =9.95 ,keywords = listOf(),categoryId = "formaggi",suggestedPerDay = 0.5),
     Product(id="Esselunga Equilibrio Ricottine fresche 2 x 100 g",name="Esselunga Equilibrio Ricottine fresche 2 x 100 g",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/721882.jpg",price =6.75 ,keywords = listOf(),categoryId = "formaggi",suggestedPerDay = 0.5),
-    Product(id="Zymil Alta Digeribilità Senza lattosio Magro Digeribile 100% Latte d'Italia 6 x 1000 ml",name="Zymil Alta Digeribilità Senza lattosio Magro Digeribile 100% Latte d'Italia 6 x 1000 ml",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/302113.jpg",price =1.59 ,keywords = listOf(),categoryId = "formaggi",suggestedPerDay = 0.5),
-    Product(id="Zymil Alta Digeribilità Senza Lattosio Bio Buono Digeribile 6 x 1000 ml",name="Zymil Alta Digeribilità Senza Lattosio Bio Buono Digeribile 6 x 1000 ml",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/302046.jpg",price =2.02 ,keywords = listOf(),categoryId = "formaggi",suggestedPerDay = 0.5),
 
+    Product(id="Zymil Alta Digeribilità Senza lattosio Magro Digeribile 100% Latte d'Italia 6 x 1000 ml",name="Zymil Alta Digeribilità Senza lattosio Magro Digeribile 100% Latte d'Italia 6 x 1000 ml",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/302113.jpg",price =1.59 ,keywords = listOf(),categoryId = "yougurt_uova",suggestedPerDay = 0.5),
+    Product(id="Zymil Alta Digeribilità Senza Lattosio Bio Buono Digeribile 6 x 1000 ml",name="Zymil Alta Digeribilità Senza Lattosio Bio Buono Digeribile 6 x 1000 ml",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/302046.jpg",price =2.02 ,keywords = listOf(),categoryId = "yougurt_uova",suggestedPerDay = 0.5),
     Product(id="Fage, TruBlend vaniglia 150 g",name="Fage, TruBlend vaniglia 150 g",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/310389.jpg",price =11.94,keywords = listOf(),categoryId = "yougurt_uova",suggestedPerDay = 0.5),
     Product(id="alplì Yogurt da Bere Fragola 500 g",name="alplì Yogurt da Bere Fragola 500 g",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/310610.jpg",price =1.98 ,keywords = listOf(),categoryId = "yougurt_uova",suggestedPerDay = 0.5),
     Product(id="alplì Yogurt da Bere Banana 500 g",name="alplì Yogurt da Bere Banana 500 g",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/310611.jpg",price =1.98 ,keywords = listOf(),categoryId = "yougurt_uova",suggestedPerDay = 0.5),
@@ -1107,13 +1106,40 @@ fun findProduct(query: String): Product? {
         it.name.lowercase().contains(q)
     }
 }
+private fun calculateScore(product: Product, query: String): Int {
+    var score = 0
 
+    val category = CATEGORIES.find { it.id == product.categoryId }
+    if (category != null) {
+        if (category.id.contains(query)) score += 100
+        if (category.displayName.lowercase().contains(query)) score += 80
+    }
+
+    if (product.name.lowercase().contains(query)) {
+        score += 50
+    }
+
+    if (product.keywords.any { it.contains(query) }) {
+        score += 30
+    }
+
+    return score
+}
 fun searchProducts(query: String): List<Product> {
     val q = query.lowercase().trim()
-
     if (q.isBlank()) return emptyList()
 
-    return PRODUCTS.filter {
-        it.name.lowercase().contains(q)
-    }.take(5)
+    return PRODUCTS
+        .map { product ->
+            val score = calculateScore(product, q)
+            product to score
+        }
+        .filter { it.second > 0 }
+        .sortedByDescending { it.second }
+        .map { it.first }
+        .take(5)
+}
+
+fun getCategoryById(id: String): Category? {
+    return CATEGORIES.firstOrNull { it.id == id }
 }
