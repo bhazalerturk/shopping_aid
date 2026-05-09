@@ -45,5 +45,6 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.viewmodel.compose)
+    implementation("io.coil-kt:coil-compose:2.6.0")
     debugImplementation(libs.androidx.ui.tooling)
 }

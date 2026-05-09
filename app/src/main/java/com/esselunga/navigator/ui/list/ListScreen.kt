@@ -1,5 +1,6 @@
 package com.esselunga.navigator.ui.list
 
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.esselunga.navigator.data.Product
 import com.esselunga.navigator.data.ShoppingItem
 import com.esselunga.navigator.data.StoreSection
@@ -57,22 +59,7 @@ private fun sectionColor(section: StoreSection?): Color = when (section) {
     null                      -> Color(0xFFF57C00)
 }
 
-private fun sectionEmoji(section: StoreSection?): String = when (section) {
-    StoreSection.FRESHPRODUCTS      -> "🥦"
-    StoreSection.BAKERY       -> "🍞"
-    StoreSection.PASTA_RICE   -> "🍝"
-    StoreSection.DISPENSA   -> "🫙"
-    StoreSection.DAIRY        -> "🥛"
-    StoreSection.DELI         -> "🥩"
-    StoreSection.MEAT         -> "🍗"
-    StoreSection.FROZEN       -> "🧊"
-    StoreSection.BREAKFAST    -> "🥣"
-    StoreSection.DRINKS       -> "🥤"
-    StoreSection.PERSONAL_CARE-> "🧴"
-    StoreSection.CLEANING     -> "🧹"
-    StoreSection.PET          -> "🐾"
-    null                      -> "❓"
-}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -226,12 +213,20 @@ fun ListScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable {
-                                            viewModel.addItem(product.name)
+                                            viewModel.addItemWithProduct(product)
                                             inputText = ""
                                         }
                                         .padding(12.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    AsyncImage(
+                                        model = product.image,
+                                        contentDescription = product.name,
+                                        modifier = Modifier
+                                            .size(80.dp)
+                                            .padding(end = 10.dp)
+                                    )
+
                                     Column(Modifier.weight(1f)) {
                                         Text(product.name, fontWeight = FontWeight.Bold)
                                         Text(text = getCategoryById(product.categoryId)?.displayName ?: product.categoryId,
@@ -263,7 +258,11 @@ fun ListScreen(
                                 val match = searchResults.firstOrNull()
 
                                 if (match != null) {
-                                    viewModel.addItem(match.name)
+                                    if (match != null) {
+                                        viewModel.addItemWithProduct(match)
+                                    } else {
+                                        viewModel.addItem(inputText)
+                                    }
                                 } else {
                                     viewModel.addItem(inputText)
                                 }
@@ -433,11 +432,16 @@ private fun ShoppingItemRow(
             )
             Column(Modifier.fillMaxWidth().padding(10.dp, 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        sectionEmoji(null),
-                        fontSize = 26.sp,
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
+                    item.product?.let { product ->
+                        AsyncImage(
+                            model = product.image,
+                            contentDescription = product.name,
+                            modifier = Modifier
+                                .size(80.dp)
+                                .padding(end = 10.dp)
+                        )
+                    }
+
                     Checkbox(
                         checked = item.checked,
                         onCheckedChange = { onToggle() },

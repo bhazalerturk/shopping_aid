@@ -11,6 +11,7 @@ import com.esselunga.navigator.util.RouteOptimizer
 import com.esselunga.navigator.util.RouteStep
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.*
+import kotlin.plus
 
 
 class ShoppingViewModel(application: Application) : AndroidViewModel(application) {
@@ -192,6 +193,17 @@ class ShoppingViewModel(application: Application) : AndroidViewModel(application
         val uri = if (contact != null) Uri.parse("smsto:${contact.phoneNumber}") else Uri.parse("smsto:")
         return Intent(Intent.ACTION_SENDTO, uri).apply {
             putExtra("sms_body", buildShareText())
+        }
+    }
+
+    fun addItemWithProduct(product: Product) {
+        _items.update {
+            it + ShoppingItem(
+                rawText = product.name,
+                product = product,
+                priceEuro = product.price,
+                quantity = 1
+            )
         }
     }
 
