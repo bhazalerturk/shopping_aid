@@ -119,7 +119,7 @@ fun NavigationScreen(
 // Map section label to a fun color for the step card
 private fun stepCardColor(step: RouteStep): Color = when (step) {
     is RouteStep.GoToAisle -> Color(0xFF1565C0)   // deep blue for navigation
-    is RouteStep.PickItem  -> when (step.item.category?.section?.name) {
+    is RouteStep.PickItem  -> when (null) {
         "PRODUCE"       -> Color(0xFF2E7D32)
         "BAKERY"        -> Color(0xFFE65100)
         "PASTA_RICE"    -> Color(0xFFF9A825)
@@ -168,7 +168,7 @@ private fun CurrentStepCard(step: RouteStep, stepNumber: Int, total: Int, onNext
                 is RouteStep.PickItem -> {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            when (step.item.category?.section?.name) {
+                            when (null) {
                                 "PRODUCE" -> "🥦"; "BAKERY" -> "🍞"; "PASTA_RICE" -> "🍝"
                                 "CONDIMENTS" -> "🫙"; "DAIRY" -> "🥛"; "DELI" -> "🥩"
                                 "MEAT" -> "🍗"; "FROZEN" -> "🧊"; "BREAKFAST" -> "🥣"
@@ -183,7 +183,7 @@ private fun CurrentStepCard(step: RouteStep, stepNumber: Int, total: Int, onNext
                             Text("🎯 Pick up", color = Color.White.copy(alpha = 0.8f), fontSize = 16.sp)
                             Text(step.item.rawText, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp)
                             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                step.item.category?.let { Text("Aisle ${it.corsia}", color = Color.White.copy(alpha = 0.7f), fontSize = 14.sp) }
+                                step.item.product?.let { Text("Aisle ${null}", color = Color.White.copy(alpha = 0.7f), fontSize = 14.sp) }
                                 if (step.item.quantity > 1) Text("x${step.item.quantity}", color = Color.White.copy(alpha = 0.9f), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                                 if (step.item.totalPrice > 0) Text(BudgetCalculator.formatEuro(step.item.totalPrice), color = Color.White.copy(alpha = 0.9f), fontSize = 14.sp)
                             }
@@ -249,7 +249,7 @@ private fun DoneCard(onBack: () -> Unit) {
 private fun UpcomingStepRow(step: RouteStep, index: Int) {
     val (label, sub) = when (step) {
         is RouteStep.GoToAisle -> "Aisle ${step.corsia}" to step.sectionLabel
-        is RouteStep.PickItem -> step.item.rawText to (step.item.category?.let { "Aisle ${it.corsia}" } ?: "")
+        is RouteStep.PickItem -> step.item.rawText to (step.item.product?.let { "Aisle ${null}" } ?: "")
         is RouteStep.AskStaff -> "Ask staff" to "${step.items.size} products"
     }
     Row(

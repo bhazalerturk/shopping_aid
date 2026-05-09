@@ -185,8 +185,8 @@ fun ReviewScreen(
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(item.rawText, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                            item.category?.let { cat ->
-                                Text("Aisle ${cat.corsia} · ${cat.section.label}", fontSize = 12.sp, color = EasylungaGreen)
+                            item.product?.let { cat ->
+                                Text("Aisle ${null} · ${null}", fontSize = 12.sp, color = EasylungaGreen)
                             }
                         }
                         Column(horizontalAlignment = Alignment.End) {

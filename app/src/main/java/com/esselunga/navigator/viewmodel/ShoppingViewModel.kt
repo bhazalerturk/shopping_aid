@@ -12,6 +12,7 @@ import com.esselunga.navigator.util.RouteStep
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.*
 
+
 class ShoppingViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = application.getSharedPreferences("easylunga", Context.MODE_PRIVATE)
@@ -25,11 +26,16 @@ class ShoppingViewModel(application: Application) : AndroidViewModel(application
 
     fun addItem(text: String) {
         if (text.isBlank()) return
-        val category = findCategory(text)
-        val price = category?.defaultPrice ?: 0.0
-        val qty = if (category != null) getSuggestedQuantity(category) else 1
+
+        val product = searchProducts(text).firstOrNull()
+
         _items.update {
-            it + ShoppingItem(rawText = text.trim(), category = category, priceEuro = price, quantity = qty)
+            it + ShoppingItem(
+                rawText = text.trim(),
+                product = product,
+                priceEuro = product?.price ?: 0.0,
+                quantity = 1
+            )
         }
     }
 
@@ -42,8 +48,8 @@ class ShoppingViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun addItemWithQuantity(categoryId: String, quantity: Int) {
-        val category = ALL_CATEGORIES.find { it.id == categoryId } ?: return
-        val existing = _items.value.find { it.category?.id == categoryId }
+        val product = null
+        val existing = _items.value.find { it.product?.id == categoryId }
         if (existing != null) {
             _items.update { list ->
                 list.map { if (it.id == existing.id) it.copy(quantity = it.quantity + quantity) else it }
@@ -51,9 +57,9 @@ class ShoppingViewModel(application: Application) : AndroidViewModel(application
         } else {
             _items.update {
                 it + ShoppingItem(
-                    rawText = category.displayNameEn,
-                    category = category,
-                    priceEuro = category.defaultPrice,
+                    rawText = "",
+                    product = product,
+                    priceEuro = 0.0,
                     quantity = quantity
                 )
             }
@@ -87,7 +93,7 @@ class ShoppingViewModel(application: Application) : AndroidViewModel(application
     }
 
     val uncheckedCount: Int get() = _items.value.count { !it.checked }
-    val unrecognizedItems: List<ShoppingItem> get() = _items.value.filter { it.category == null }
+    val unrecognizedItems: List<ShoppingItem> get() = _items.value.filter { it.product == null }
 
     // Reactive total cost — always in sync with items list
     val totalCostFlow: StateFlow<Double> = _items

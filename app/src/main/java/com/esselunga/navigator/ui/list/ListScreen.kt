@@ -3,6 +3,7 @@ package com.esselunga.navigator.ui.list
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,9 +28,9 @@ import androidx.compose.ui.unit.sp
 import com.esselunga.navigator.data.Product
 import com.esselunga.navigator.data.ShoppingItem
 import com.esselunga.navigator.data.StoreSection
-import com.esselunga.navigator.data.findCategory
 import com.esselunga.navigator.util.BudgetCalculator
 import com.esselunga.navigator.util.BudgetStatus
+import com.esselunga.navigator.data.searchProducts
 import com.esselunga.navigator.viewmodel.ShoppingViewModel
 import kotlinx.coroutines.launch
 
@@ -39,10 +40,10 @@ private val DangerRed = Color(0xFFD32F2F)
 
 // Fun color per category section
 private fun sectionColor(section: StoreSection?): Color = when (section) {
-    StoreSection.PRODUCE      -> Color(0xFF43A047)
+    StoreSection.FRESHPRODUCTS      -> Color(0xFF43A047)
     StoreSection.BAKERY       -> Color(0xFFFF8F00)
     StoreSection.PASTA_RICE   -> Color(0xFFFBC02D)
-    StoreSection.CONDIMENTS   -> Color(0xFF8E24AA)
+    StoreSection.DISPENSA   -> Color(0xFF8E24AA)
     StoreSection.DAIRY        -> Color(0xFF0288D1)
     StoreSection.DELI         -> Color(0xFFD81B60)
     StoreSection.MEAT         -> Color(0xFFE53935)
@@ -56,10 +57,10 @@ private fun sectionColor(section: StoreSection?): Color = when (section) {
 }
 
 private fun sectionEmoji(section: StoreSection?): String = when (section) {
-    StoreSection.PRODUCE      -> "🥦"
+    StoreSection.FRESHPRODUCTS      -> "🥦"
     StoreSection.BAKERY       -> "🍞"
     StoreSection.PASTA_RICE   -> "🍝"
-    StoreSection.CONDIMENTS   -> "🫙"
+    StoreSection.DISPENSA   -> "🫙"
     StoreSection.DAIRY        -> "🥛"
     StoreSection.DELI         -> "🥩"
     StoreSection.MEAT         -> "🍗"
@@ -88,16 +89,26 @@ fun ListScreen(
     val wizardActive = days > 1 || people > 1
 
     var inputText by remember { mutableStateOf("") }
+    val searchResults = remember(inputText) {
+        if (inputText.length >= 2) {
+            searchProducts(inputText)
+        } else {
+            emptyList()
+        }
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
     // Live preview of recognized product as user types
+    /*
     val previewCategory: Product? = remember(inputText) {
         if (inputText.length >= 2) findCategory(inputText) else null
     }
     val previewSuggestedQty: Int? = remember(previewCategory, days, people) {
         previewCategory?.let { viewModel.getSuggestedQuantity(it) }
     }
+
+     */
 
     val budgetStatus = BudgetCalculator.budgetStatus(totalCost, budget)
     val progressColor by animateColorAsState(
@@ -112,21 +123,11 @@ fun ListScreen(
     val checkedCount = items.count { it.checked }
     val totalCount = items.size
 
-    fun tryAddItem(text: String, qty: Int = 0) {
+    fun tryAddItem(text: String) {
         if (text.isBlank()) return
-        val category = findCategory(text)
-        val finalQty = if (qty > 0) qty else (category?.let { viewModel.getSuggestedQuantity(it) } ?: 1)
-        val itemCost = (category?.defaultPrice ?: 0.0) * finalQty
 
-        if (budget > 0 && viewModel.wouldExceedBudget(itemCost)) {
-            scope.launch {
-                snackbarHostState.showSnackbar(
-                    "🚫 Can't add — only ${BudgetCalculator.formatEuro(viewModel.budgetRemaining)} left in budget!"
-                )
-            }
-            return
-        }
         viewModel.addItem(text)
+
         inputText = ""
     }
 
@@ -211,59 +212,31 @@ fun ListScreen(
                 }
 
                 // Product preview card — shows when text matches a product
-                if (previewCategory != null) {
-                    val color = sectionColor(previewCategory.section)
+                if (searchResults.isNotEmpty()) {
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.10f)),
-                        border = CardDefaults.outlinedCardBorder().copy(
-                            width = 1.5.dp
-                        )
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .border(1.5.dp, color.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Text(sectionEmoji(previewCategory.section), fontSize = 32.sp)
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    previewCategory.displayNameEn,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = color
-                                )
-                                Text(
-                                    "Aisle ${previewCategory.corsia} · ${BudgetCalculator.formatEuro(previewCategory.defaultPrice)} each",
-                                    fontSize = 12.sp,
-                                    color = Color.Gray
-                                )
-                                if (wizardActive && previewSuggestedQty != null && previewSuggestedQty > 1) {
-                                    Text(
-                                        "💡 We suggest $previewSuggestedQty for $people ${if (people == 1) "person" else "people"}, $days ${if (days == 1) "day" else "days"}",
-                                        fontSize = 12.sp,
-                                        color = EasylungaGreen,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
+                        Column {
+                            searchResults.forEach { product ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            viewModel.addItem(product.name)
+                                            inputText = ""
+                                        }
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(product.name, fontWeight = FontWeight.Bold)
+                                        Text(product.categoryId, fontSize = 12.sp, color = Color.Gray)
+                                    }
+                                    Text("${product.price} €")
                                 }
-                            }
-                            Button(
-                                onClick = { tryAddItem(inputText, previewSuggestedQty ?: 1) },
-                                colors = ButtonDefaults.buttonColors(containerColor = color),
-                                shape = RoundedCornerShape(10.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Text(
-                                    if (wizardActive && (previewSuggestedQty ?: 1) > 1)
-                                        "Add ${previewSuggestedQty}x"
-                                    else "Add",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
                             }
                         }
                     }
@@ -283,11 +256,33 @@ fun ListScreen(
                         singleLine = true,
                         textStyle = LocalTextStyle.current.copy(fontSize = 18.sp),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = { tryAddItem(inputText) }),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                val match = searchResults.firstOrNull()
+
+                                if (match != null) {
+                                    viewModel.addItem(match.name)
+                                } else {
+                                    viewModel.addItem(inputText)
+                                }
+
+                                inputText = ""
+                            }
+                        ),
                         shape = RoundedCornerShape(12.dp)
                     )
                     IconButton(
-                        onClick = { tryAddItem(inputText) },
+                        onClick = {
+                            val match = searchResults.firstOrNull()
+
+                            if (match != null) {
+                                viewModel.addItem(match.name)
+                            } else {
+                                viewModel.addItem(inputText)
+                            }
+
+                            inputText = ""
+                        },
                         modifier = Modifier.size(56.dp),
                         colors = IconButtonDefaults.iconButtonColors(containerColor = EasylungaGreen)
                     ) {
@@ -363,7 +358,7 @@ fun ListScreen(
                 contentPadding = PaddingValues(vertical = 14.dp)
             ) {
                 items(items, key = { it.id }) { item ->
-                    val suggestedQty = item.category?.let { viewModel.getSuggestedQuantity(it) }
+                    val suggestedQty = item.product?.let { viewModel.getSuggestedQuantity(it) }
                     ShoppingItemRow(
                         item = item,
                         budget = budget,
@@ -404,7 +399,7 @@ private fun ShoppingItemRow(
     onIncrement: () -> Unit,
     onDecrement: () -> Unit
 ) {
-    val color = sectionColor(item.category?.section)
+    val color = sectionColor(null)
     val priceColor = when {
         item.checked                                      -> Color.Gray
         budget > 0 && totalCost > budget                  -> DangerRed
@@ -412,7 +407,7 @@ private fun ShoppingItemRow(
     }
     val bgColor = when {
         item.checked        -> Color(0xFFF5F5F5)
-        item.category == null -> Color(0xFFFFF3E0)
+        item.product == null -> Color(0xFFFFF3E0)
         else                -> color.copy(alpha = 0.06f)
     }
 
@@ -437,7 +432,7 @@ private fun ShoppingItemRow(
             Column(Modifier.fillMaxWidth().padding(10.dp, 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        sectionEmoji(item.category?.section),
+                        sectionEmoji(null),
                         fontSize = 26.sp,
                         modifier = Modifier.padding(end = 8.dp)
                     )
@@ -456,9 +451,9 @@ private fun ShoppingItemRow(
                             textDecoration = if (item.checked) TextDecoration.LineThrough else null,
                             color = if (item.checked) Color.Gray else Color.Black
                         )
-                        if (item.category != null) {
+                        if (item.product != null) {
                             Text(
-                                text = "Aisle ${item.category.corsia} · ${item.category.section.label}",
+                                text = "Aisle ${null} · ${null}",
                                 fontSize = 12.sp,
                                 color = color
                             )

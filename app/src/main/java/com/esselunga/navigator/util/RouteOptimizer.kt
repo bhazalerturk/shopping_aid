@@ -12,20 +12,23 @@ object RouteOptimizer {
 
     fun optimize(items: List<ShoppingItem>): List<RouteStep> {
         val recognized = items
-            .filter { it.category != null && !it.checked }
-            .sortedBy { it.category!!.corsia }
+            .filter { it.product != null && !it.checked }
+            .sortedBy { null}
 
-        val unrecognized = items.filter { it.category == null && !it.checked }
+        val unrecognized = items.filter { it.product == null && !it.checked }
 
         val steps = mutableListOf<RouteStep>()
         var lastCorsia = -1
 
         for (item in recognized) {
-            val corsia = item.category!!.corsia
+            val corsia = null
+            /*
             if (corsia != lastCorsia) {
-                steps.add(RouteStep.GoToAisle(corsia, item.category.section.label))
-                lastCorsia = corsia
+                steps.add(RouteStep.GoToAisle(null, item.category.section.label))
+                lastCorsia = null
             }
+
+             */
             steps.add(RouteStep.PickItem(item))
         }
 
