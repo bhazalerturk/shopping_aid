@@ -24,7 +24,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.esselunga.navigator.data.ProductCategory
+import com.esselunga.navigator.data.Product
 import com.esselunga.navigator.data.ShoppingItem
 import com.esselunga.navigator.data.StoreSection
 import com.esselunga.navigator.data.findCategory
@@ -92,7 +92,7 @@ fun ListScreen(
     val scope = rememberCoroutineScope()
 
     // Live preview of recognized product as user types
-    val previewCategory: ProductCategory? = remember(inputText) {
+    val previewCategory: Product? = remember(inputText) {
         if (inputText.length >= 2) findCategory(inputText) else null
     }
     val previewSuggestedQty: Int? = remember(previewCategory, days, people) {

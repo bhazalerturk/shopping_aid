@@ -33,7 +33,7 @@ class ShoppingViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun getSuggestedQuantity(category: ProductCategory): Int {
+    fun getSuggestedQuantity(category: Product): Int {
         val days = _wizardDays.value
         val people = _wizardPeople.value
         // Only suggest if wizard was actually used (not defaults)
