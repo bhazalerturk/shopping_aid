@@ -1143,3 +1143,8 @@ fun searchProducts(query: String): List<Product> {
 fun getCategoryById(id: String): Category? {
     return CATEGORIES.firstOrNull { it.id == id }
 }
+
+fun getAisleByCategoryId(categoryId: String): Int? {
+    return CATEGORIES.firstOrNull { it.id == categoryId }?.corsia
+}
+

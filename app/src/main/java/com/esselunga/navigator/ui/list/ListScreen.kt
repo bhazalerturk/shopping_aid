@@ -199,40 +199,104 @@ fun ListScreen(
                     }
                 }
 
-                // Product preview card — shows when text matches a product
+                // Product preview cards
                 if (searchResults.isNotEmpty()) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp),
-                        shape = RoundedCornerShape(12.dp)
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column {
-                            searchResults.forEach { product ->
+                        searchResults.take(3).forEach { product ->
+
+                            val category = getCategoryById(product.categoryId)
+                            val color = sectionColor(category?.section)
+
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = color.copy(alpha = 0.10f)
+                                ),
+                                border = CardDefaults.outlinedCardBorder().copy(
+                                    width = 1.5.dp
+                                )
+                            ) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .border(
+                                            1.5.dp,
+                                            color.copy(alpha = 0.4f),
+                                            RoundedCornerShape(12.dp)
+                                        )
                                         .clickable {
                                             viewModel.addItemWithProduct(product)
                                             inputText = ""
                                         }
                                         .padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
+
                                     AsyncImage(
                                         model = product.image,
                                         contentDescription = product.name,
-                                        modifier = Modifier
-                                            .size(80.dp)
-                                            .padding(end = 10.dp)
+                                        modifier = Modifier.size(72.dp)
                                     )
 
-                                    Column(Modifier.weight(1f)) {
-                                        Text(product.name, fontWeight = FontWeight.Bold)
-                                        Text(text = getCategoryById(product.categoryId)?.displayName ?: product.categoryId,
-                                            fontSize = 12.sp, color = Color.Gray)
+                                    Column(
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+
+                                        Text(
+                                            text = product.name,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = color
+                                        )
+
+                                        Spacer(Modifier.height(2.dp))
+
+                                        Text(
+                                            text = buildString {
+                                                append("Aisle ${category?.corsia ?: "?"}")
+
+                                                category?.displayName?.let {
+                                                    append(" · $it")
+                                                }
+                                            },
+                                            fontSize = 12.sp,
+                                            color = Color.Gray
+                                        )
+
+                                        Spacer(Modifier.height(4.dp))
+
+                                        Text(
+                                            text = "${product.price} € each",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = color
+                                        )
                                     }
-                                    Text("${product.price} €")
+
+                                    Button(
+                                        onClick = {
+                                            viewModel.addItemWithProduct(product)
+                                            inputText = ""
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = color
+                                        ),
+                                        shape = RoundedCornerShape(10.dp),
+                                        contentPadding = PaddingValues(
+                                            horizontal = 12.dp,
+                                            vertical = 6.dp
+                                        )
+                                    ) {
+                                        Text(
+                                            "Add",
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -458,8 +522,9 @@ private fun ShoppingItemRow(
                             color = if (item.checked) Color.Gray else Color.Black
                         )
                         if (item.product != null) {
+                            val category = getCategoryById(item.product.categoryId)
                             Text(
-                                text = "Aisle ${null} · ${null}",
+                                text = "Aisle ${category?.corsia} · ${category?.displayName}",
                                 fontSize = 12.sp,
                                 color = color
                             )
