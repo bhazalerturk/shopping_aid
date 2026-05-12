@@ -20,7 +20,9 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navDeepLink
 import com.esselunga.navigator.ui.budget.BudgetScreen
+import com.esselunga.navigator.ui.caregiver.CreateCaregiverFromLinkScreen
 import com.esselunga.navigator.ui.help.HelpScreen
 import com.esselunga.navigator.ui.home.HomeScreen
 import com.esselunga.navigator.ui.list.ListScreen
@@ -39,6 +41,7 @@ object Routes {
     const val NAVIGATION = "navigation"
     const val MAP = "map"
     const val HELP = "help"
+    const val CREATE_CAREGIVER = "create_caregiver"
 }
 
 class MainActivity : ComponentActivity() {
@@ -58,7 +61,7 @@ class MainActivity : ComponentActivity() {
             )
             MaterialTheme(typography = typography) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    EasylungaApp()
+                    EasylungaApp(intent = this@MainActivity.intent)
                 }
             }
         }
@@ -84,6 +87,9 @@ class MainActivity : ComponentActivity() {
         if (NfcAdapter.ACTION_NDEF_DISCOVERED == intent.action ||
             NfcAdapter.ACTION_TAG_DISCOVERED == intent.action) {
             nfcTrigger++
+        } else {
+            // Handle deep links when app is already open
+            setIntent(intent)
         }
     }
 
@@ -93,7 +99,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun EasylungaApp() {
+fun EasylungaApp(intent: Intent? = null) {
     val navController: NavHostController = rememberNavController()
     val shoppingViewModel: ShoppingViewModel = viewModel()
     val nfcTrigger = MainActivity.nfcTrigger
@@ -103,6 +109,12 @@ fun EasylungaApp() {
             navController.navigate(Routes.BUDGET) {
                 popUpTo(Routes.HOME) { inclusive = false }
             }
+        }
+    }
+
+    LaunchedEffect(intent) {
+        if (intent != null) {
+            navController.handleDeepLink(intent)
         }
     }
 
@@ -161,6 +173,31 @@ fun EasylungaApp() {
             HelpScreen(
                 viewModel = shoppingViewModel,
                 onBack = { navController.popBackStack() }
+            )
+        }
+        composable(
+            route = Routes.CREATE_CAREGIVER + "?name={name}&phone={phone}",
+            arguments = listOf(
+                androidx.navigation.navArgument("name") { defaultValue = ""; nullable = true },
+                androidx.navigation.navArgument("phone") { defaultValue = ""; nullable = true }
+            ),
+            deepLinks = listOf(
+                navDeepLink { uriPattern = "shoppingaid://create-caregiver?name={name}&phone={phone}" }
+            )
+        ) { backStackEntry ->
+            val name = backStackEntry.arguments?.getString("name")
+            val phone = backStackEntry.arguments?.getString("phone")
+            CreateCaregiverFromLinkScreen(
+                viewModel = shoppingViewModel,
+                initialName = name.takeIf { !it.isNullOrBlank() },
+                initialPhone = phone.takeIf { !it.isNullOrBlank() },
+                onBack = { navController.popBackStack() },
+                onSaved = {
+                    // After saving caregiver, go to ListScreen to create the list
+                    navController.navigate(Routes.LIST) {
+                        popUpTo(Routes.HOME) { inclusive = false }
+                    }
+                }
             )
         }
     }

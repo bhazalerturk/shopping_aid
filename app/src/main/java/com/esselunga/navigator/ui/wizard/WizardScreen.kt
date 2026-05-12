@@ -1,5 +1,7 @@
 package com.esselunga.navigator.ui.wizard
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -10,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -275,6 +278,8 @@ private fun SendLinkDialog(
     onDismiss: () -> Unit,
     onSendLink: () -> Unit
 ) {
+    val context = LocalContext.current
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("📤 Share Caregiver Link", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
@@ -304,17 +309,39 @@ private fun SendLinkDialog(
             }
         },
         confirmButton = {
-            Button(
-                onClick = {
-                    // Generate shareable link
-                    val shareLink = "shoppingaid://create-caregiver"
-                    val shareText = "Help me create a shopping list: $shareLink"
-                    // Would be called from MainActivity with Intent
-                    onSendLink()
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = EasylungaGreen)
-            ) {
-                Text("Share Link", color = Color.White)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = {
+                        val shareLink = "shoppingaid://create-caregiver"
+                        val shareText = "Help me create a shopping list!\n\n$shareLink"
+
+                        val shareIntent = Intent().apply {
+                            action = Intent.ACTION_SEND
+                            putExtra(Intent.EXTRA_TEXT, shareText)
+                            type = "text/plain"
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, "Share Caregiver Link"))
+                        onSendLink()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = EasylungaGreen),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Share Link", color = Color.White)
+                }
+
+                // Provisional button for trials
+                Button(
+                    onClick = {
+                        val uri = android.net.Uri.parse("shoppingaid://create-caregiver?name=Test&phone=%2B39123456789")
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
+                        context.startActivity(intent)
+                        onSendLink()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("🧪 Provisional button for trials", color = Color.White, fontSize = 13.sp)
+                }
             }
         },
         dismissButton = {
