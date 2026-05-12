@@ -23,6 +23,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navDeepLink
 import com.esselunga.navigator.ui.budget.BudgetScreen
 import com.esselunga.navigator.ui.caregiver.CreateCaregiverFromLinkScreen
+import com.esselunga.navigator.ui.caregiver_interface.CaregiverInterfaceScreen
 import com.esselunga.navigator.ui.help.HelpScreen
 import com.esselunga.navigator.ui.home.HomeScreen
 import com.esselunga.navigator.ui.list.ListScreen
@@ -42,6 +43,7 @@ object Routes {
     const val MAP = "map"
     const val HELP = "help"
     const val CREATE_CAREGIVER = "create_caregiver"
+    const val CAREGIVER_INTERFACE = "caregiver_interface"
 }
 
 class MainActivity : ComponentActivity() {
@@ -198,6 +200,21 @@ fun EasylungaApp(intent: Intent? = null) {
                         popUpTo(Routes.HOME) { inclusive = false }
                     }
                 }
+            )
+        }
+        composable(
+            route = "caregiver_interface?listId={listId}",
+            arguments = listOf(
+                androidx.navigation.navArgument("listId") { defaultValue = "current"; nullable = true }
+            ),
+            deepLinks = listOf(
+                navDeepLink { uriPattern = "shoppingaid://caregiver-list?listId={listId}" }
+            )
+        ) { backStackEntry ->
+            val listId = backStackEntry.arguments?.getString("listId") ?: "current"
+            CaregiverInterfaceScreen(
+                viewModel = shoppingViewModel,
+                onListReady = { navController.navigate(Routes.LIST) }
             )
         }
     }

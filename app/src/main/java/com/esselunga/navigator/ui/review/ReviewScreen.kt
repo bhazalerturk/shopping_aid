@@ -103,7 +103,16 @@ fun ReviewScreen(
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Button(
                                     onClick = {
-                                        context.startActivity(viewModel.shareSmsIntent())
+                                        // Enviar link en vez de SMS
+                                        val listId = "current" // Puedes cambiar esto por un id real si tienes lógica de IDs
+                                        val shareLink = "shoppingaid://caregiver-list?listId=$listId"
+                                        val shareText = "Haz clic para ayudarme con la lista de la compra:\n$shareLink"
+                                        val sendIntent = android.content.Intent().apply {
+                                            action = android.content.Intent.ACTION_SEND
+                                            putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                                            type = "text/plain"
+                                        }
+                                        context.startActivity(android.content.Intent.createChooser(sendIntent, "Share Link"))
                                     },
                                     modifier = Modifier.weight(1f).height(50.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = EasylungaGreen),
@@ -111,7 +120,7 @@ fun ReviewScreen(
                                 ) {
                                     Icon(Icons.Default.Share, contentDescription = null)
                                     Spacer(Modifier.width(6.dp))
-                                    Text("Send List", fontSize = 15.sp)
+                                    Text("Send Link", fontSize = 15.sp)
                                 }
                                 OutlinedButton(
                                     onClick = { showCaregiverSetup = !showCaregiverSetup },
