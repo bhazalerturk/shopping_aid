@@ -328,7 +328,7 @@ private fun SendLinkDialog(
                 ) {
                     Text("Share Link", color = Color.White)
                 }
-
+                /*
                 // Provisional button for trials
                 Button(
                     onClick = {
@@ -341,7 +341,7 @@ private fun SendLinkDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("🧪 Provisional button for trials", color = Color.White, fontSize = 13.sp)
-                }
+                }*/
             }
         },
         dismissButton = {
