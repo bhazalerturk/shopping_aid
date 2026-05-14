@@ -1,5 +1,7 @@
 package com.esselunga.navigator.ui.wizard
 
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -10,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -34,7 +37,7 @@ fun WizardScreen(
             .fillMaxSize()
             .background(EasylungaLightGreen)
     ) {
-        // Step dots (2 steps)
+        // Step dots (3 steps)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -42,14 +45,14 @@ fun WizardScreen(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            repeat(2) { i ->
+            repeat(3) { i ->
                 Box(
                     modifier = Modifier
                         .size(if (i == step) 14.dp else 10.dp)
                         .clip(CircleShape)
                         .background(if (i <= step) EasylungaGreen else Color.LightGray)
                 )
-                if (i < 1) Spacer(Modifier.width(8.dp))
+                if (i < 2) Spacer(Modifier.width(8.dp))
             }
         }
 
@@ -66,8 +69,12 @@ fun WizardScreen(
                 selectedPeople = people,
                 days = days,
                 onSelect = { viewModel.setWizardPeople(it) },
-                onNext = onDone,
+                onNext = { step = 2 },
                 onBack = { step = 0 }
+            )
+            2 -> ListStep(
+                onNext = onDone,
+                onBack = { step = 1 }
             )
         }
     }
@@ -203,8 +210,146 @@ private fun PeopleStep(
                 colors = ButtonDefaults.buttonColors(containerColor = EasylungaGreen),
                 shape = RoundedCornerShape(14.dp)
             ) {
-                Text("Build My List →", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("Next →", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
+}
+
+@Composable
+private fun ListStep(
+    onNext: () -> Unit,
+    onBack: () -> Unit
+) {
+    var showSendLinkDialog by remember { mutableStateOf(false) }
+
+    if (showSendLinkDialog) {
+        SendLinkDialog(
+            onDismiss = { showSendLinkDialog = false },
+            onSendLink = { showSendLinkDialog = false }
+        )
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("📝", fontSize = 64.sp)
+            Text(
+                "How do you want to make the list?",
+                fontSize = 26.sp, fontWeight = FontWeight.Bold,
+                color = EasylungaGreen, textAlign = TextAlign.Center
+            )
+            Text("You can always make it yourself and then send it to others", fontSize = 15.sp, color = Color.Gray, textAlign = TextAlign.Center)
+        }
+
+        Spacer(Modifier.height(32.dp))
+
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth(0.9f)) {
+            Button(
+                onClick = onNext,
+                modifier = Modifier.fillMaxWidth().height(64.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = EasylungaGreen,
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(14.dp),
+                elevation = ButtonDefaults.buttonElevation(2.dp)
+            ) {
+                Text("Make the list by myself", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            }
+
+            OutlinedButton(
+                onClick = { showSendLinkDialog = true },
+                modifier = Modifier.fillMaxWidth().height(64.dp),
+                shape = RoundedCornerShape(14.dp),
+                border = ButtonDefaults.outlinedButtonBorder
+            ) {
+                Text("Send link for someone to create it", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = EasylungaGreen)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SendLinkDialog(
+    onDismiss: () -> Unit,
+    onSendLink: () -> Unit
+) {
+    val context = LocalContext.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("📤 Share Caregiver Link", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Send this link to someone so they can create the shopping list for you:", fontSize = 14.sp, color = Color.Gray)
+
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                        Text("Link:", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = EasylungaGreen)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "shoppingaid://create-caregiver",
+                            fontSize = 12.sp,
+                            color = Color.DarkGray,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                Text("✓ They'll be able to add items to your shopping list", fontSize = 13.sp, color = Color.DarkGray)
+                Text("✓ You can review everything before you start shopping", fontSize = 13.sp, color = Color.DarkGray)
+            }
+        },
+        confirmButton = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = {
+                        val shareLink = "shoppingaid://create-caregiver"
+                        val shareText = "Help me create a shopping list!\n\n$shareLink"
+
+                        val shareIntent = Intent().apply {
+                            action = Intent.ACTION_SEND
+                            putExtra(Intent.EXTRA_TEXT, shareText)
+                            type = "text/plain"
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, "Share Caregiver Link"))
+                        onSendLink()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = EasylungaGreen),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Share Link", color = Color.White)
+                }
+                /*
+                // Provisional button for trials
+                Button(
+                    onClick = {
+                        val uri = android.net.Uri.parse("shoppingaid://create-caregiver?name=Test&phone=%2B39123456789")
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
+                        context.startActivity(intent)
+                        onSendLink()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("🧪 Provisional button for trials", color = Color.White, fontSize = 13.sp)
+                }*/
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = EasylungaGreen)
+            }
+        },
+        shape = RoundedCornerShape(14.dp),
+        containerColor = Color.White
+    )
 }
