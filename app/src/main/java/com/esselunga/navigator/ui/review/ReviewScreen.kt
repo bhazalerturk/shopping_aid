@@ -36,8 +36,6 @@ fun ReviewScreen(
     val context = LocalContext.current
 
     var showCaregiverSetup by remember { mutableStateOf(false) }
-    var caregiverName by remember { mutableStateOf(caregiver?.name ?: "") }
-    var caregiverPhone by remember { mutableStateOf(caregiver?.phoneNumber ?: "") }
 
     Scaffold(
         topBar = {
