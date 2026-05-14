@@ -98,22 +98,20 @@ fun ReviewScreen(
                 ) {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("Share with caregiver", fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                        if (caregiver != null) {
-                            Text("${caregiver!!.name} · ${caregiver!!.phoneNumber}", fontSize = 14.sp, color = Color.Gray)
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Button(
-                                    onClick = {
-                                        // Enviar link en vez de SMS
-                                        val listId = "current" // Puedes cambiar esto por un id real si tienes lógica de IDs
-                                        val shareLink = "shoppingaid://caregiver-list?listId=$listId"
-                                        val shareText = "Haz clic para ayudarme con la lista de la compra:\n$shareLink"
-                                        val sendIntent = android.content.Intent().apply {
-                                            action = android.content.Intent.ACTION_SEND
-                                            putExtra(android.content.Intent.EXTRA_TEXT, shareText)
-                                            type = "text/plain"
-                                        }
-                                        context.startActivity(android.content.Intent.createChooser(sendIntent, "Share Link"))
-                                    },
+
+                        Text("${caregiver!!.name} · ${caregiver!!.phoneNumber}", fontSize = 14.sp, color = Color.Gray)
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Button(
+                                onClick = {
+                                    val listId = "current"
+                                    val shareLink = "shoppingaid://caregiver-list?listId=$listId"
+                                    val shareText = "Click here to help me making mi shopping list:\n$shareLink"
+                                    val sendIntent = android.content.Intent().apply {
+                                        action = android.content.Intent.ACTION_SEND
+                                        putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                                        type = "text/plain"
+                                    }
+                                    context.startActivity(android.content.Intent.createChooser(sendIntent, "Share Link")) },
                                     modifier = Modifier.weight(1f).height(50.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = EasylungaGreen),
                                     shape = RoundedCornerShape(10.dp)
@@ -130,50 +128,6 @@ fun ReviewScreen(
                                     Text("Edit", fontSize = 15.sp)
                                 }
                             }
-                        } else {
-                            Text("No caregiver configured.", fontSize = 14.sp, color = Color.Gray)
-                            Button(
-                                onClick = { showCaregiverSetup = true },
-                                modifier = Modifier.fillMaxWidth().height(50.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8F5E9), contentColor = EasylungaGreen),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Text("+ Add caregiver", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-
-                        if (showCaregiverSetup) {
-                            OutlinedTextField(
-                                value = caregiverName,
-                                onValueChange = { caregiverName = it },
-                                label = { Text("Caregiver name") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                shape = RoundedCornerShape(10.dp)
-                            )
-                            OutlinedTextField(
-                                value = caregiverPhone,
-                                onValueChange = { caregiverPhone = it },
-                                label = { Text("Phone number") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                                shape = RoundedCornerShape(10.dp)
-                            )
-                            Button(
-                                onClick = {
-                                    if (caregiverName.isNotBlank() && caregiverPhone.isNotBlank()) {
-                                        viewModel.setCaregiverContact(caregiverName, caregiverPhone)
-                                        showCaregiverSetup = false
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth().height(48.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = EasylungaGreen),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Text("Save Caregiver", fontSize = 15.sp)
-                            }
-                        }
                     }
                 }
             }
