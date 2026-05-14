@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 private val EasylungaGreen = Color(0xFF00843D)
 private val WarningYellow = Color(0xFFF9A825)
 private val DangerRed = Color(0xFFD32F2F)
+private val CaregiverPurple = Color(0xFF5E35B1)
 
 // Fun color per category section
 private fun sectionColor(section: StoreSection?): Color = when (section) {
@@ -78,7 +79,9 @@ fun ListScreen(
     viewModel: ShoppingViewModel,
     onStartNavigation: () -> Unit,
     onReview: () -> Unit,
-    onAddWithWizard: () -> Unit
+    onAddWithWizard: () -> Unit,
+    isCaregiverMode: Boolean = false,
+    onCaregiverDone: (() -> Unit)? = null
 ) {
     val items by viewModel.items.collectAsState()
     val budget by viewModel.budget.collectAsState()
@@ -100,11 +103,12 @@ fun ListScreen(
     }
 
     val budgetStatus = BudgetCalculator.budgetStatus(totalCost, budget)
+    val baseThemeColor = if (isCaregiverMode) CaregiverPurple else EasylungaGreen
     val progressColor by animateColorAsState(
         targetValue = when (budgetStatus) {
             BudgetStatus.OVER    -> DangerRed
             BudgetStatus.WARNING -> WarningYellow
-            else                 -> EasylungaGreen
+            else                 -> baseThemeColor
         },
         animationSpec = tween(400), label = "budgetColor"
     )
@@ -145,8 +149,18 @@ fun ListScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("My Shopping List", fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                        if (totalCount > 0) {
+                        Text(
+                            if (isCaregiverMode) "Help with the list" else "My Shopping List",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp
+                        )
+                        if (isCaregiverMode) {
+                            Text(
+                                "Caregiver mode",
+                                fontSize = 12.sp,
+                                color = Color.White.copy(alpha = 0.85f)
+                            )
+                        } else if (totalCount > 0) {
                             Text(
                                 "🎯 $checkedCount / $totalCount items found",
                                 fontSize = 12.sp,
@@ -156,11 +170,11 @@ fun ListScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = EasylungaGreen,
+                    containerColor = baseThemeColor,
                     titleContentColor = Color.White
                 ),
                 actions = {
-                    if (items.isNotEmpty()) {
+                    if (items.isNotEmpty() && !isCaregiverMode) {
                         TextButton(onClick = { viewModel.clearAll() }) {
                             Text("Clear all", color = Color.White, fontSize = 15.sp)
                         }
@@ -269,7 +283,7 @@ fun ListScreen(
                     }
                 }
 
-                // Input row
+                // Input row (visible in both user + caregiver modes)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -279,7 +293,12 @@ fun ListScreen(
                         value = inputText,
                         onValueChange = { inputText = it },
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("Type a product…", fontSize = 17.sp) },
+                        placeholder = {
+                            Text(
+                                if (isCaregiverMode) "Add an item…" else "Type a product…",
+                                fontSize = 17.sp
+                            )
+                        },
                         singleLine = true,
                         textStyle = LocalTextStyle.current.copy(fontSize = 18.sp),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -289,7 +308,9 @@ fun ListScreen(
                     IconButton(
                         onClick = { tryAddItem(inputText) },
                         modifier = Modifier.size(56.dp),
-                        colors = IconButtonDefaults.iconButtonColors(containerColor = EasylungaGreen)
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = if (isCaregiverMode) baseThemeColor else EasylungaGreen
+                        )
                     ) {
                         Icon(
                             Icons.Default.Add,
@@ -300,35 +321,54 @@ fun ListScreen(
                     }
                 }
 
-                // Action buttons
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = onAddWithWizard,
-                        modifier = Modifier.weight(1f).height(52.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("🧙 Wizard", fontSize = 15.sp)
+                if (!isCaregiverMode) {
+                    // Action buttons (user mode)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = onAddWithWizard,
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("🧙 Wizard", fontSize = 15.sp)
+                        }
+                        OutlinedButton(
+                            onClick = onReview,
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            enabled = items.isNotEmpty(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("👤 Review", fontSize = 15.sp)
+                        }
                     }
-                    OutlinedButton(
-                        onClick = onReview,
-                        modifier = Modifier.weight(1f).height(52.dp),
-                        enabled = items.isNotEmpty(),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("👤 Review", fontSize = 15.sp)
-                    }
-                }
 
-                Button(
-                    onClick = onStartNavigation,
-                    modifier = Modifier.fillMaxWidth().height(60.dp),
-                    enabled = items.any { !it.checked },
-                    colors = ButtonDefaults.buttonColors(containerColor = EasylungaGreen),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(26.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Start Shopping", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Button(
+                        onClick = onStartNavigation,
+                        modifier = Modifier.fillMaxWidth().height(60.dp),
+                        enabled = items.any { !it.checked },
+                        colors = ButtonDefaults.buttonColors(containerColor = EasylungaGreen),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(26.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Start Shopping", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    // Caregiver mode: lightweight hint + Done button
+                    Text(
+                        "You can add, remove, or edit items. When you're done, press Done.",
+                        fontSize = 13.sp,
+                        color = Color.Gray
+                    )
+
+                    Button(
+                        onClick = { onCaregiverDone?.invoke() },
+                        modifier = Modifier.fillMaxWidth().height(54.dp),
+                        enabled = onCaregiverDone != null,
+                        colors = ButtonDefaults.buttonColors(containerColor = baseThemeColor),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text("Done", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
                 }
             }
         }
@@ -343,9 +383,18 @@ fun ListScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text("🛒", fontSize = 72.sp)
-                    Text("Your list is empty", color = Color.DarkGray, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    Text("Type a product above to get started", color = Color.LightGray, fontSize = 15.sp)
-                    if (!wizardActive) {
+                    Text(
+                        if (isCaregiverMode) "No items yet" else "Your list is empty",
+                        color = Color.DarkGray,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        if (isCaregiverMode) "Add items to help build the list" else "Type a product above to get started",
+                        color = Color.LightGray,
+                        fontSize = 15.sp
+                    )
+                    if (!wizardActive && !isCaregiverMode) {
                         Spacer(Modifier.height(4.dp))
                         OutlinedButton(onClick = onAddWithWizard, shape = RoundedCornerShape(12.dp)) {
                             Text("🧙 Use the Wizard for suggestions")
@@ -370,6 +419,7 @@ fun ListScreen(
                         totalCost = totalCost,
                         suggestedQty = suggestedQty,
                         wizardActive = wizardActive,
+                        isCaregiverMode = isCaregiverMode,
                         onToggle = { viewModel.toggleChecked(item.id) },
                         onRemove = { viewModel.removeItem(item.id) },
                         onIncrement = {
@@ -399,6 +449,7 @@ private fun ShoppingItemRow(
     totalCost: Double,
     suggestedQty: Int?,
     wizardActive: Boolean,
+    isCaregiverMode: Boolean,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
     onIncrement: () -> Unit,
@@ -532,7 +583,7 @@ private fun ShoppingItemRow(
                             Text(
                                 "💡 Suggested: $suggestedQty",
                                 fontSize = 12.sp,
-                                color = EasylungaGreen,
+                                color = if (isCaregiverMode) CaregiverPurple else EasylungaGreen,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }

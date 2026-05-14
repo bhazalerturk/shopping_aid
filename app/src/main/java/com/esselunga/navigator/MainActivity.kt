@@ -153,7 +153,10 @@ fun EasylungaApp(intent: Intent? = null) {
             ReviewScreen(
                 viewModel = shoppingViewModel,
                 onBack = { navController.popBackStack() },
-                onGoShopping = { navController.navigate(Routes.NAVIGATION) }
+                onGoShopping = { navController.navigate(Routes.NAVIGATION) },
+                onOpenCaregiverInterface = { listId ->
+                    navController.navigate("caregiver_interface?listId=$listId")
+                }
             )
         }
         composable(Routes.NAVIGATION) {
@@ -214,6 +217,7 @@ fun EasylungaApp(intent: Intent? = null) {
             val listId = backStackEntry.arguments?.getString("listId") ?: "current"
             CaregiverInterfaceScreen(
                 viewModel = shoppingViewModel,
+                listId = listId,
                 onListReady = { navController.navigate(Routes.LIST) }
             )
         }
