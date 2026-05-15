@@ -27,16 +27,21 @@ class ShoppingViewModel(application: Application) : AndroidViewModel(application
 
     fun addItem(text: String) {
         if (text.isBlank()) return
-
         val product = searchProducts(text).firstOrNull()
-
-        _items.update {
-            it + ShoppingItem(
-                rawText = text.trim(),
-                product = product,
-                priceEuro = product?.price ?: 0.0,
-                quantity = 1
-            )
+        val existing = _items.value.find { it.product?.id == product?.id && product != null }
+        if (existing != null) {
+            _items.update { list ->
+                list.map { if (it.id == existing.id) it.copy(quantity = (it.quantity + 1).coerceAtMost(20)) else it }
+            }
+        } else {
+            _items.update {
+                it + ShoppingItem(
+                    rawText = text.trim(),
+                    product = product,
+                    priceEuro = product?.price ?: 0.0,
+                    quantity = 1
+                )
+            }
         }
     }
 
@@ -197,13 +202,20 @@ class ShoppingViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun addItemWithProduct(product: Product) {
-        _items.update {
-            it + ShoppingItem(
-                rawText = product.name,
-                product = product,
-                priceEuro = product.price,
-                quantity = 1
-            )
+        val existing = _items.value.find { it.product?.id == product.id }
+        if (existing != null) {
+            _items.update { list ->
+                list.map { if (it.id == existing.id) it.copy(quantity = (it.quantity + 1).coerceAtMost(20)) else it }
+            }
+        } else {
+            _items.update {
+                it + ShoppingItem(
+                    rawText = product.name,
+                    product = product,
+                    priceEuro = product.price,
+                    quantity = 1
+                )
+            }
         }
     }
 

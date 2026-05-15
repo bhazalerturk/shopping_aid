@@ -1148,3 +1148,26 @@ fun getAisleByCategoryId(categoryId: String): Int? {
     return CATEGORIES.firstOrNull { it.id == categoryId }?.corsia
 }
 
+fun getAveragePriceForCategory(categoryId: String): Double {
+    val prices = PRODUCTS.filter { it.categoryId == categoryId }.map { it.price }
+    return if (prices.isEmpty()) 0.0 else prices.average()
+}
+
+fun isExpensiveForCategory(productPrice: Double, categoryId: String, marginFraction: Double = 0.20): Boolean {
+    val avg = getAveragePriceForCategory(categoryId)
+    return avg > 0.0 && productPrice > avg * (1.0 + marginFraction)
+}
+
+fun getAveragePriceForProductType(categoryId: String, searchQuery: String): Double {
+    val query = searchQuery.trim().lowercase()
+    val filtered = if (query.length >= 2) {
+        PRODUCTS.filter { it.categoryId == categoryId && it.name.lowercase().contains(query) }
+    } else emptyList()
+    return if (filtered.isEmpty()) getAveragePriceForCategory(categoryId)
+    else filtered.map { it.price }.average()
+}
+
+fun isExpensiveForProductType(productPrice: Double, categoryId: String, searchQuery: String, marginFraction: Double = 0.20): Boolean {
+    val avg = getAveragePriceForProductType(categoryId, searchQuery)
+    return avg > 0.0 && productPrice > avg * (1.0 + marginFraction)
+}

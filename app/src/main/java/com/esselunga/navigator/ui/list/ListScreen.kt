@@ -3,6 +3,7 @@ package com.esselunga.navigator.ui.list
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
@@ -26,7 +27,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import androidx.compose.ui.res.painterResource
 import com.esselunga.navigator.data.Product
 import com.esselunga.navigator.data.ShoppingItem
 import com.esselunga.navigator.data.StoreSection
@@ -34,6 +35,8 @@ import com.esselunga.navigator.util.BudgetCalculator
 import com.esselunga.navigator.util.BudgetStatus
 import com.esselunga.navigator.data.searchProducts
 import com.esselunga.navigator.data.getCategoryById
+import com.esselunga.navigator.data.getAveragePriceForProductType
+import com.esselunga.navigator.data.isExpensiveForProductType
 import com.esselunga.navigator.viewmodel.ShoppingViewModel
 import kotlinx.coroutines.launch
 
@@ -80,6 +83,28 @@ fun ListScreen(
     val wizardActive = days > 1 || people > 1
 
     var inputText by remember { mutableStateOf("") }
+    var showExpensiveDialog  by remember { mutableStateOf(false) }
+    var pendingProductName   by remember { mutableStateOf("") }
+    var pendingProduct       by remember { mutableStateOf<Product?>(null) }
+    var pendingAvgPrice      by remember { mutableStateOf(0.0) }
+    var pendingCategoryName  by remember { mutableStateOf("") }
+
+    // ── Budget warning state ───────────────────────────────────────────────
+    var showBudgetWarning        by remember { mutableStateOf(false) }
+    var budgetWarningProductName by remember { mutableStateOf("") }
+    var budgetWarningProduct     by remember { mutableStateOf<Product?>(null) }
+    var budgetWarningRemaining   by remember { mutableStateOf(0.0) }
+    var budgetWarningItemPrice   by remember { mutableStateOf(0.0) }
+
+    // ── Quantity warning state ─────────────────────────────────────────────
+    var showQuantityWarning       by remember { mutableStateOf(false) }
+    var quantityWarningName       by remember { mutableStateOf("") }
+    var quantityWarningRecommended by remember { mutableStateOf(0) }
+    var quantityWarningCurrent    by remember { mutableStateOf(0) }
+    var quantityPendingProductName by remember { mutableStateOf("") }
+    var quantityPendingProduct    by remember { mutableStateOf<Product?>(null) }
+    var quantityPendingIsIncrement by remember { mutableStateOf(false) }
+    val quantityPendingItemId     by remember { mutableStateOf("") }
     val searchResults = remember(inputText) {
         if (inputText.length >= 2) {
             searchProducts(inputText)
@@ -115,13 +140,199 @@ fun ListScreen(
     val checkedCount = items.count { it.checked }
     val totalCount = items.size
 
-    fun tryAddItem(text: String) {
-        if (text.isBlank()) return
+    fun tryAddWithCheck(productName: String, product: Product?) {
+        if (productName.isBlank()) return
 
-        viewModel.addItem(text)
+        // Check budget warning first
+        if (budget > 0 && product != null && viewModel.wouldExceedBudget(product.price)) {
+            budgetWarningProductName = productName
+            budgetWarningProduct = product
+            budgetWarningRemaining = viewModel.budgetRemaining
+            budgetWarningItemPrice = product.price
+            showBudgetWarning = true
+            return
+        }
 
-        inputText = ""
+        // Check quantity warning
+        if (wizardActive && product != null && product.suggestedPerDay > 0) {
+            val suggestedQty = viewModel.getSuggestedQuantity(product)
+            val existingQty = items.filter { it.product?.id == product.id }.sumOf { it.quantity }
+            if (existingQty >= suggestedQty) {
+                quantityWarningName = productName
+                quantityWarningRecommended = suggestedQty
+                quantityWarningCurrent = existingQty
+                quantityPendingProductName = productName
+                quantityPendingProduct = product
+                quantityPendingIsIncrement = false
+                showQuantityWarning = true
+                return
+            }
+        }
+
+        // Check price warning
+        if (product != null && isExpensiveForProductType(product.price, product.categoryId, inputText)) {
+            pendingProductName  = productName
+            pendingProduct      = product
+            pendingAvgPrice     = getAveragePriceForProductType(product.categoryId, inputText)
+            pendingCategoryName = getCategoryById(product.categoryId)?.displayName ?: product.categoryId
+            showExpensiveDialog = true
+        } else {
+            viewModel.addItem(productName)
+            inputText = ""
+        }
     }
+    if (showExpensiveDialog) {
+        AlertDialog(
+            onDismissRequest = { showExpensiveDialog = false },
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text("💰 This item is expensive!", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "⚠️ \"$pendingProductName\" is more expensive than similar products.",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "Do you still want to add it?",
+                        fontSize = 16.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.addItem(pendingProductName)
+                        inputText = ""
+                        showExpensiveDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = EasylungaGreen)
+                ) { Text("✅ Yes, add it", fontSize = 15.sp) }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showExpensiveDialog = false }) {
+                    Text("❌ No, go back", fontSize = 15.sp)
+                }
+            }
+        )
+    }
+
+    // ── Quantity warning dialog ────────────────────────────────────────────
+    if (showQuantityWarning) {
+        AlertDialog(
+            onDismissRequest = { showQuantityWarning = false },
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text("📦 That's a lot!", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "The recommended amount for $days ${if (days == 1) "day" else "days"} and $people ${if (people == 1) "person" else "people"} is $quantityWarningRecommended.",
+                        fontSize = 16.sp
+                    )
+                    Text(
+                        "You already have $quantityWarningCurrent of \"$quantityWarningName\". Do you still want to add more?",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (quantityPendingIsIncrement) {
+                            viewModel.incrementQuantity(quantityPendingItemId)
+                        } else {
+                            val product = quantityPendingProduct
+                            if (product != null && isExpensiveForProductType(product.price, product.categoryId, inputText)) {
+                                pendingProductName = quantityPendingProductName
+                                pendingProduct = product
+                                pendingAvgPrice = getAveragePriceForProductType(product.categoryId, inputText)
+                                pendingCategoryName = getCategoryById(product.categoryId)?.displayName ?: product.categoryId
+                                showExpensiveDialog = true
+                            } else {
+                                quantityPendingProduct?.let { viewModel.addItemWithProduct(it) }
+                                inputText = ""
+                            }
+                        }
+                        showQuantityWarning = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = EasylungaGreen)
+                ) { Text("✅ Yes, add more", fontSize = 15.sp) }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showQuantityWarning = false }) {
+                    Text("❌ No, that's enough", fontSize = 15.sp)
+                }
+            }
+        )
+    }
+
+        // ── Budget warning dialog ─────────────────────────────────────────────
+        if (showBudgetWarning) {
+            AlertDialog(
+                onDismissRequest = { showBudgetWarning = false },
+                shape = RoundedCornerShape(20.dp),
+                title = {
+                    Text("💸 This exceeds your budget!", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            "\"$budgetWarningProductName\" costs ${BudgetCalculator.formatEuro(budgetWarningItemPrice)} but you only have ${BudgetCalculator.formatEuro(budgetWarningRemaining)} left.",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            "Do you still want to add it?",
+                            fontSize = 16.sp
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showBudgetWarning = false
+                            val product = budgetWarningProduct
+                            // Continue with quantity and price checks
+                            if (wizardActive && product != null && product.suggestedPerDay > 0) {
+                                val suggestedQty = viewModel.getSuggestedQuantity(product)
+                                val existingQty = items.filter { it.product?.id == product.id }.sumOf { it.quantity }
+                                if (existingQty >= suggestedQty) {
+                                    quantityWarningName = budgetWarningProductName
+                                    quantityWarningRecommended = suggestedQty
+                                    quantityWarningCurrent = existingQty
+                                    quantityPendingProductName = budgetWarningProductName
+                                    quantityPendingProduct = product
+                                    quantityPendingIsIncrement = false
+                                    showQuantityWarning = true
+                                    return@Button
+                                }
+                            }
+                            if (product != null && isExpensiveForProductType(product.price, product.categoryId, inputText)) {
+                                pendingProductName = budgetWarningProductName
+                                pendingProduct = product
+                                pendingAvgPrice = getAveragePriceForProductType(product.categoryId, inputText)
+                                pendingCategoryName = getCategoryById(product.categoryId)?.displayName ?: product.categoryId
+                                showExpensiveDialog = true
+                            } else {
+                                viewModel.addItem(budgetWarningProductName)
+                                inputText = ""
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = DangerRed)
+                    ) { Text("✅ Yes, add anyway", fontSize = 15.sp) }
+                },
+                dismissButton = {
+                    OutlinedButton(onClick = { showBudgetWarning = false }) {
+                        Text("❌ No, go back", fontSize = 15.sp)
+                    }
+                }
+            )
+        }
 
     Scaffold(
         snackbarHost = {
@@ -242,16 +453,39 @@ fun ListScreen(
                                             RoundedCornerShape(12.dp)
                                         )
                                         .clickable {
-                                            viewModel.addItemWithProduct(product)
-                                            inputText = ""
+                                            if (wizardActive && product.suggestedPerDay > 0) {
+                                                val suggestedQty = viewModel.getSuggestedQuantity(product)
+                                                val existingQty = items.filter { it.product?.id == product.id }.sumOf { it.quantity }
+                                                if (existingQty >= suggestedQty) {
+                                                    quantityWarningName = product.name
+                                                    quantityWarningRecommended = suggestedQty
+                                                    quantityWarningCurrent = existingQty
+                                                    quantityPendingProductName = product.name
+                                                    quantityPendingProduct = product
+                                                    quantityPendingIsIncrement = false
+                                                    showQuantityWarning = true
+                                                    return@clickable
+                                                }
+                                            }
+                                            if (isExpensiveForProductType(product.price, product.categoryId, inputText)) {
+                                                pendingProductName = product.name
+                                                pendingProduct = product
+                                                pendingAvgPrice = getAveragePriceForProductType(product.categoryId, inputText)
+                                                pendingCategoryName = getCategoryById(product.categoryId)?.displayName ?: product.categoryId
+                                                showExpensiveDialog = true
+                                            } else {
+                                                viewModel.addItem(product.name)
+                                                inputText = ""
+                                            }
                                         }
                                         .padding(12.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
 
-                                    AsyncImage(
-                                        model = product.image,
+                                    // Product image (placeholder)
+                                    Image(
+                                        painter = painterResource(android.R.drawable.ic_menu_gallery),
                                         contentDescription = product.name,
                                         modifier = Modifier.size(72.dp)
                                     )
@@ -293,8 +527,7 @@ fun ListScreen(
 
                                     Button(
                                         onClick = {
-                                            viewModel.addItemWithProduct(product)
-                                            inputText = ""
+                                            tryAddWithCheck(product.name, product)
                                         },
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = color
@@ -341,13 +574,9 @@ fun ListScreen(
                                 val match = searchResults.firstOrNull()
 
                                 if (match != null) {
-                                    if (match != null) {
-                                        viewModel.addItemWithProduct(match)
-                                    } else {
-                                        viewModel.addItem(inputText)
-                                    }
+                                    tryAddWithCheck(match.name, match)
                                 } else {
-                                    viewModel.addItem(inputText)
+                                    tryAddWithCheck(match?.name ?: inputText, match)
                                 }
 
                                 inputText = ""
@@ -359,13 +588,7 @@ fun ListScreen(
                         onClick = {
                             val match = searchResults.firstOrNull()
 
-                            if (match != null) {
-                                viewModel.addItem(match.name)
-                            } else {
-                                viewModel.addItem(inputText)
-                            }
-
-                            inputText = ""
+                            tryAddWithCheck(match?.name ?: inputText, match)
                         },
                         modifier = Modifier.size(56.dp),
                         colors = IconButtonDefaults.iconButtonColors(
@@ -435,7 +658,9 @@ fun ListScreen(
     ) { paddingValues ->
         if (items.isEmpty()) {
             Box(
-                modifier = Modifier.fillMaxSize().padding(paddingValues),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -443,22 +668,12 @@ fun ListScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text("🛒", fontSize = 72.sp)
-                    Text(
-                        if (isCaregiverMode) "No items yet" else "Your list is empty",
-                        color = Color.DarkGray,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        if (isCaregiverMode) "Add items to help build the list" else "Type a product above to get started",
-                        color = Color.LightGray,
-                        fontSize = 15.sp
-                    )
-                    if (!wizardActive && !isCaregiverMode) {
-                        Spacer(Modifier.height(4.dp))
-                        OutlinedButton(onClick = onAddWithWizard, shape = RoundedCornerShape(12.dp)) {
-                            Text("🧙 Use the Wizard for suggestions")
-                        }
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedButton(
+                        onClick = onAddWithWizard,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("🧙 Use the Wizard for suggestions")
                     }
                 }
             }
@@ -479,7 +694,6 @@ fun ListScreen(
                         totalCost = totalCost,
                         suggestedQty = suggestedQty,
                         wizardActive = wizardActive,
-                        isCaregiverMode = isCaregiverMode,
                         onToggle = { viewModel.toggleChecked(item.id) },
                         onRemove = { viewModel.removeItem(item.id) },
                         onIncrement = {
@@ -509,7 +723,6 @@ private fun ShoppingItemRow(
     totalCost: Double,
     suggestedQty: Int?,
     wizardActive: Boolean,
-    isCaregiverMode: Boolean,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
     onIncrement: () -> Unit,
@@ -548,8 +761,9 @@ private fun ShoppingItemRow(
             Column(Modifier.fillMaxWidth().padding(10.dp, 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     item.product?.let { product ->
-                        AsyncImage(
-                            model = product.image,
+                        // Product image (placeholder)
+                        Image(
+                            painter = painterResource(android.R.drawable.ic_menu_gallery),
                             contentDescription = product.name,
                             modifier = Modifier
                                 .size(80.dp)
@@ -649,7 +863,6 @@ private fun ShoppingItemRow(
                             Text(
                                 "💡 Suggested: $suggestedQty",
                                 fontSize = 12.sp,
-                                color = if (isCaregiverMode) CaregiverPurple else EasylungaGreen,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
