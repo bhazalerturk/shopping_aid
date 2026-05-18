@@ -36,62 +36,75 @@ private val PassColor       = Color(0xFF90A4AE)    // grey for pass-through
 // Measure pixel positions on your PNG, then divide by (imageWidth, imageHeight).
 // ─────────────────────────────────────────────────────────────────────────────
 private val nodeCoordinates: Map<String, Pair<Float, Float>> = mapOf(
-    // ── Walk corridor nodes (verified against store_mapOG.png 2500×3334) ────
-    "WALK_1"  to Pair(0.0550f, 0.1280f),
-    "WALK_2"  to Pair(0.0550f, 0.2000f),
-    "WALK_3"  to Pair(0.0550f, 0.2650f),
-    "WALK_4"  to Pair(0.0550f, 0.2960f),
-    "WALK_5"  to Pair(0.0550f, 0.3240f),
-    "WALK_6"  to Pair(0.0550f, 0.3530f),
-    "WALK_7"  to Pair(0.0550f, 0.3810f),
-    "WALK_8"  to Pair(0.0550f, 0.4100f),
-    "WALK_9"  to Pair(0.0550f, 0.4380f),
-    "WALK_10" to Pair(0.0550f, 0.4660f),
-    "WALK_11" to Pair(0.0550f, 0.5100f),
-    "WALK_12" to Pair(0.0550f, 0.5600f),
-    "WALK_13" to Pair(0.0550f, 0.7000f),
-    "WALK_14" to Pair(0.1700f, 0.8750f),
-    "WALK_15" to Pair(0.6350f, 0.8750f),
-    "WALK_16" to Pair(0.6350f, 0.8150f),
-    "WALK_17" to Pair(0.6350f, 0.7550f),
-    "WALK_18" to Pair(0.6350f, 0.7050f),
-    "WALK_19" to Pair(0.6350f, 0.6500f),
-    "WALK_20" to Pair(0.6350f, 0.5920f),
-    "WALK_21" to Pair(0.6350f, 0.5350f),
-    "WALK_22" to Pair(0.6350f, 0.4800f),
-    "WALK_23" to Pair(0.6350f, 0.4220f),
-    "WALK_24" to Pair(0.6350f, 0.3630f),
-    "WALK_25" to Pair(0.6350f, 0.3070f),
-    "WALK_26" to Pair(0.6350f, 0.2570f),
-    "WALK_27" to Pair(0.6600f, 0.8980f),
-    "WALK_28" to Pair(0.6800f, 0.4800f),
-    "WALK_29" to Pair(0.6800f, 0.6500f),
 
-    // ── Zone / section nodes ─────────────────────────────────────────────────
-    "FRESHPRODUCTS1" to Pair(0.1300f, 0.1280f),
-    "FRESHPRODUCTS2" to Pair(0.1300f, 0.0630f),
-    "FRESHPRODUCTS3" to Pair(0.3500f, 0.0630f),
-    "FRESHPRODUCTS4" to Pair(0.5000f, 0.0630f),
-    "FRESHPRODUCTS5" to Pair(0.5000f, 0.1480f),
-    "FRESHPRODUCTS6" to Pair(0.3500f, 0.1480f),
-    "BAKERY"         to Pair(0.7000f, 0.9450f),
-    "PASTA_RICE"     to Pair(0.1850f, 0.3530f),
-    "DISPENSA"       to Pair(0.1850f, 0.3240f),
-    "DAIRY"          to Pair(0.1850f, 0.2960f),
-    "DELI"           to Pair(0.1850f, 0.2650f),
-    "MEAT"           to Pair(0.7200f, 0.2700f),
-    "FROZEN"         to Pair(0.5000f, 0.8150f),
-    "BREAKFAST"      to Pair(0.1850f, 0.3810f),
-    "DRINKS"         to Pair(0.1850f, 0.3530f),  // no dedicated node on map
-    "PERSONAL_CARE"  to Pair(0.1850f, 0.4100f),
-    "CLEANING"       to Pair(0.1850f, 0.4380f),
-    "PET"            to Pair(0.1850f, 0.4660f),
+    // ── Entrance / Exit ─────────────────────────────
+    "ENTRANCE" to Pair(0.0701f, 0.2107f),
+    "EXIT"     to Pair(0.0335f, 0.7502f),
 
-    // ── Special nodes ────────────────────────────────────────────────────────
-    "ENTRANCE"  to Pair(0.0500f, 0.0820f),
-    "EXIT"      to Pair(0.0500f, 0.8700f),
-    "CHECKOUT1" to Pair(0.0550f, 0.3800f),
-    "CHECKOUT2" to Pair(0.0550f, 0.6600f),
+    // ── Checkout ────────────────────────────────────
+    "CHECKOUT1" to Pair(0.1151f, 0.4193f),
+    "CHECKOUT2" to Pair(0.1137f, 0.6119f),
+
+    // ── Fresh products ──────────────────────────────
+    "FRESHPRODUCTS1" to Pair(0.2038f, 0.2476f),
+    "FRESHPRODUCTS2" to Pair(0.2038f, 0.2013f),
+    "FRESHPRODUCTS3" to Pair(0.4305f, 0.2013f),
+    "FRESHPRODUCTS4" to Pair(0.6374f, 0.2013f),
+    "FRESHPRODUCTS5" to Pair(0.6374f, 0.2592f),
+    "FRESHPRODUCTS6" to Pair(0.4276f, 0.2592f),
+
+    // ── WALK corridor ───────────────────────────────
+    "WALK_1"  to Pair(0.1250f, 0.2469f),
+    "WALK_2"  to Pair(0.3024f, 0.2592f),
+    "WALK_3"  to Pair(0.3024f, 0.3345f),
+    "WALK_4"  to Pair(0.2137f, 0.3686f),
+    "WALK_5"  to Pair(0.2137f, 0.4069f),
+    "WALK_6"  to Pair(0.2137f, 0.4468f),
+    "WALK_7"  to Pair(0.2137f, 0.4852f),
+    "WALK_8"  to Pair(0.2137f, 0.5250f),
+    "WALK_9"  to Pair(0.2137f, 0.5605f),
+    "WALK_10" to Pair(0.2137f, 0.5988f),
+    "WALK_11" to Pair(0.2137f, 0.6401f),
+    "WALK_12" to Pair(0.2517f, 0.6734f),
+    "WALK_13" to Pair(0.2531f, 0.7140f),
+    "WALK_14" to Pair(0.3038f, 0.7553f),
+
+    "WALK_15" to Pair(0.8612f, 0.7538f),
+    "WALK_16" to Pair(0.8612f, 0.7140f),
+    "WALK_17" to Pair(0.8612f, 0.6734f),
+    "WALK_18" to Pair(0.8612f, 0.6401f),
+    "WALK_19" to Pair(0.8612f, 0.5988f),
+    "WALK_20" to Pair(0.8612f, 0.5605f),
+    "WALK_21" to Pair(0.8612f, 0.5250f),
+    "WALK_22" to Pair(0.8612f, 0.4852f),
+    "WALK_23" to Pair(0.8612f, 0.4468f),
+    "WALK_24" to Pair(0.8612f, 0.4069f),
+    "WALK_25" to Pair(0.8612f, 0.3693f),
+    "WALK_26" to Pair(0.8612f, 0.3345f),
+
+    "WALK_27" to Pair(0.9091f, 0.7705f),
+    "WALK_28" to Pair(0.9443f, 0.4866f),
+    "WALK_29" to Pair(0.9471f, 0.6010f),
+
+    // ── Sections ────────────────────────────────────
+    "DELI"          to Pair(0.5698f, 0.3345f),
+    "MEAT"          to Pair(1.0006f, 0.3794f),
+    "BAKERY"        to Pair(0.9583f, 0.8031f),
+
+    "FROZEN"        to Pair(0.4896f, 0.7140f),
+    "PET"           to Pair(0.4896f, 0.5988f),
+    "CLEANING"      to Pair(0.4896f, 0.5605f),
+    "PERSONAL_CARE" to Pair(0.4896f, 0.5206f),
+    "BREAKFAST"     to Pair(0.4896f, 0.4852f),
+    "PASTA_RICE"    to Pair(0.4896f, 0.4468f),
+    "DISPENSA"      to Pair(0.4896f, 0.4069f),
+    "DAIRY"         to Pair(0.4896f, 0.3686f),
+
+    // ── Boundaries ──────────────────────────────────
+    "a" to Pair(0.0f, 0.16f),
+    "b" to Pair(1.0f, 0.16f),
+    "c" to Pair(0.0f, 0.84f),
+    "d" to Pair(1.0f, 0.84f)
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
