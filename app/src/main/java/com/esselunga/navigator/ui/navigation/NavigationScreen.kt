@@ -90,6 +90,11 @@ fun NavigationScreen(
     val currentStep = route.getOrNull(currentStepIndex)
     val totalSteps  = route.size
 
+
+    LaunchedEffect(currentStepIndex) {
+        viewModel.setNavigationStep(currentStepIndex)
+    }
+
     // Items belonging to the current EnterSection
     val sectionItems = remember(currentStep, fullRoute) {
         if (currentStep !is RouteStep.EnterSection) return@remember emptyList()
@@ -107,6 +112,7 @@ fun NavigationScreen(
         animationSpec = tween(durationMillis = 400),
         label = "progressAnim"
     )
+
 
     Scaffold(
         containerColor = Green50,

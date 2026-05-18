@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.lifecycle.AndroidViewModel
 import com.esselunga.navigator.data.*
 import com.esselunga.navigator.util.BudgetCalculator
@@ -13,6 +14,9 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.*
 import kotlin.plus
 import com.esselunga.navigator.util.OptimizedRoute
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 
 
 class ShoppingViewModel(application: Application) : AndroidViewModel(application) {
@@ -41,6 +45,12 @@ class ShoppingViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    var currentNavigationStep by mutableIntStateOf(0)
+        private set
+
+    fun setNavigationStep(index: Int) {
+        currentNavigationStep = index
+    }
     fun getSuggestedQuantity(category: Product): Int {
         val days = _wizardDays.value
         val people = _wizardPeople.value
