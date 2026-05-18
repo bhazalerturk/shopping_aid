@@ -12,6 +12,7 @@ import com.esselunga.navigator.util.RouteStep
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.*
 import kotlin.plus
+import com.esselunga.navigator.util.OptimizedRoute
 
 
 class ShoppingViewModel(application: Application) : AndroidViewModel(application) {
@@ -22,7 +23,7 @@ class ShoppingViewModel(application: Application) : AndroidViewModel(application
     private val _items = MutableStateFlow<List<ShoppingItem>>(emptyList())
     val items: StateFlow<List<ShoppingItem>> = _items.asStateFlow()
 
-    val route: List<RouteStep>
+    val route: OptimizedRoute
         get() = RouteOptimizer.optimize(_items.value)
 
     fun addItem(text: String) {

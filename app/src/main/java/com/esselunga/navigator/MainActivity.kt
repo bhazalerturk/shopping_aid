@@ -147,7 +147,8 @@ fun EasylungaApp() {
                 viewModel = shoppingViewModel,
                 onBack = { navController.popBackStack() },
                 onOpenMap = { navController.navigate(Routes.MAP) },
-                onHelp = { navController.navigate(Routes.HELP) }
+                onHelp = { navController.navigate(Routes.HELP) },
+                onFinish = { navController.popBackStack() }
             )
         }
         composable(Routes.MAP) {

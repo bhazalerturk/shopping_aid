@@ -31,9 +31,6 @@ fun MapScreen(
     onBack: () -> Unit,
     onHelp: () -> Unit
 ) {
-    val route = remember(viewModel.items.collectAsState().value) { viewModel.route }
-    val activeAisles = route.filterIsInstance<RouteStep.GoToAisle>().map { it.corsia }.toSet()
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -73,25 +70,9 @@ fun MapScreen(
                 elevation = CardDefaults.cardElevation(2.dp)
             ) {
                 Canvas(modifier = Modifier.fillMaxSize().padding(8.dp)) {
-                    drawStoreMap(activeAisles)
                 }
             }
 
-            // Active aisle list
-            if (activeAisles.isNotEmpty()) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                        Text("Your route visits:", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = EasylungaGreen)
-                        Text(
-                            activeAisles.sorted().joinToString(", ") { "Aisle $it" },
-                            fontSize = 14.sp, color = Color.DarkGray
-                        )
-                    }
-                }
-            }
         }
     }
 }
