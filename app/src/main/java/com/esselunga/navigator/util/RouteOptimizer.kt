@@ -2,6 +2,9 @@ package com.esselunga.navigator.util
 
 import com.esselunga.navigator.data.ShoppingItem
 import java.util.prefs.NodeChangeEvent
+import com.esselunga.navigator.data.CATEGORIES
+import com.esselunga.navigator.data.StoreSection
+import android.util.Log
 
 /**
  * Sorts shopping items into an optimal walking route through the store.
@@ -77,39 +80,39 @@ val edges = listOf(
 
     Edge("WALK_2", "WALK_3", 1),
 
-    Edge("WALK_3", "CHECKOUT1", 1),
+    Edge("WALK_3", "CHECKOUT1", 10),
     Edge("WALK_3", "WALK_4", 1),
     Edge("WALK_3", "DELI", 0),
 
-    Edge("WALK_4", "CHECKOUT1", 1),
+    Edge("WALK_4", "CHECKOUT1", 10),
     Edge("WALK_4", "WALK_5", 1),
     Edge("WALK_4", "DAIRY", 0),
 
     Edge("WALK_5", "DISPENSA", 0),
-    Edge("WALK_5", "CHECKOUT1", 1),
+    Edge("WALK_5", "CHECKOUT1", 10),
     Edge("WALK_5", "WALK_6", 1),
 
-    Edge("WALK_6", "CHECKOUT1", 1),
+    Edge("WALK_6", "CHECKOUT1", 10),
     Edge("WALK_6", "WALK_7", 1),
     Edge("WALK_6", "PASTA_RICE", 0),
 
     Edge("WALK_7", "BREAKFAST", 0),
-    Edge("WALK_7", "CHECKOUT2", 1),
+    Edge("WALK_7", "CHECKOUT2", 10),
     Edge("WALK_7", "WALK_8", 1),
 
-    Edge("WALK_8", "CHECKOUT2", 1),
+    Edge("WALK_8", "CHECKOUT2", 10),
     Edge("WALK_8", "WALK_9", 1),
     Edge("WALK_8", "PERSONAL_CARE", 0),
 
-    Edge("WALK_9", "CHECKOUT2", 1),
+    Edge("WALK_9", "CHECKOUT2", 10),
     Edge("WALK_9", "WALK_10", 1),
     Edge("WALK_9", "CLEANING", 0),
 
     Edge("WALK_10", "WALK_11", 1),
-    Edge("WALK_10", "CHECKOUT2", 1),
+    Edge("WALK_10", "CHECKOUT2", 10),
     Edge("WALK_10", "PET", 0),
 
-    Edge("WALK_11", "CHECKOUT2", 1),
+    Edge("WALK_11", "CHECKOUT2", 10),
     Edge("WALK_11", "WALK_12", 1),
     Edge("WALK_11", "WALK_18", 1),
 
@@ -175,10 +178,393 @@ val edges = listOf(
 
 ) + freshEdges
 
+data class OptimizedRoute(
+    val path: List<String>,
+    val steps: List<RouteStep>
+)
 
 object RouteOptimizer {
 
-    fun optimize(items: List<ShoppingItem>): List<RouteStep> {
+    fun groupItemsByStoreSection(
+        items: List<ShoppingItem>
+    ): Map<StoreSection, List<ShoppingItem>> {
+
+        val categoriesById = CATEGORIES.associateBy { it.id }
+
+        return items
+            .filter { it.product != null }
+            .groupBy { item ->
+
+                val categoryId = item.product!!.categoryId
+
+                val category = categoriesById[categoryId]
+                    ?: error("Category not found: $categoryId")
+
+                category.section
+            }
+    }
+
+    private val orderedSections = listOf(
+        StoreSection.FRESHPRODUCTS,
+        StoreSection.DELI,
+        StoreSection.MEAT,
+        StoreSection.DAIRY,
+        StoreSection.DISPENSA,
+        StoreSection.PASTA_RICE,
+        StoreSection.BREAKFAST,
+        StoreSection.PERSONAL_CARE,
+        StoreSection.CLEANING,
+        StoreSection.PET,
+        StoreSection.FROZEN
+    )
+
+    private val checkout2Sections = setOf(
+        StoreSection.BREAKFAST,
+        StoreSection.PERSONAL_CARE,
+        StoreSection.CLEANING,
+        StoreSection.PET,
+        StoreSection.FROZEN
+    )
+
+    private val bidirectionalEdges = edges.flatMap {
+        listOf(
+            it,
+            Edge(it.to, it.from, it.weight)
+        )
+    }
+
+    private val graph: Map<String, List<Edge>> =
+        bidirectionalEdges.groupBy { it.from }
+
+
+    private fun shortestPath(
+        start: String,
+        end: String
+    ): List<String> {
+
+        val distances = mutableMapOf<String, Int>()
+        val previous = mutableMapOf<String, String?>()
+        val unvisited = nodes.map { it.id }.toMutableSet()
+
+        nodes.forEach {
+            distances[it.id] = Int.MAX_VALUE
+            previous[it.id] = null
+        }
+
+        distances[start] = 0
+
+        while (unvisited.isNotEmpty()) {
+
+            val current = unvisited.minByOrNull {
+                distances[it] ?: Int.MAX_VALUE
+            } ?: break
+
+            if (current == end) break
+
+            unvisited.remove(current)
+
+            val neighbors = graph[current] ?: emptyList()
+
+            for (edge in neighbors) {
+
+                val newDistance =
+                    (distances[current] ?: Int.MAX_VALUE) + edge.weight
+
+                if (newDistance < (distances[edge.to] ?: Int.MAX_VALUE)) {
+
+                    distances[edge.to] = newDistance
+                    previous[edge.to] = current
+                }
+            }
+        }
+
+        val path = mutableListOf<String>()
+
+        var current: String? = end
+
+        while (current != null) {
+            path.add(current)
+            current = previous[current]
+        }
+
+        return path.reversed()
+    }
+
+
+    private fun nodeIdToSection(
+        nodeId: String
+    ): StoreSection? {
+
+        return when {
+
+            nodeId.startsWith("FRESHPRODUCTS") ->
+                StoreSection.FRESHPRODUCTS
+
+            else ->
+                StoreSection.entries.find {
+                    it.name == nodeId
+                }
+        }
+    }
+
+    data class NavigationRoute(
+        val path: List<String>,
+        val steps: List<RouteStep>
+    )
+
+    fun optimize(items: List<ShoppingItem>): OptimizedRoute {
+
+        val grouped = groupItemsByStoreSection(items)
+
+        val requiredSections = grouped.keys
+
+        val visitOrder = orderedSections.filter {
+            it in requiredSections
+        }
+
+        val useCheckout2 = visitOrder.any {
+            it in checkout2Sections
+        }
+
+        val checkout = if (useCheckout2) {
+            "CHECKOUT2"
+        } else {
+            "CHECKOUT1"
+        }
+
+        val targets = mutableListOf<String>()
+
+        targets.add("ENTRANCE")
+
+        visitOrder.forEach { section ->
+
+            val nodeId = when (section) {
+
+                StoreSection.FRESHPRODUCTS ->
+                    "FRESHPRODUCTS1"
+
+                else ->
+                    section.name
+            }
+
+            targets.add(nodeId)
+        }
+
+        targets.add(checkout)
+
+        Log.d("RouteOptimizer", "========== TARGETS ==========")
+
+        targets.forEach {
+            Log.d("RouteOptimizer", it)
+        }
+
+        val fullRoute = mutableListOf<String>()
+
+        for (i in 0 until targets.size - 1) {
+
+            val from = targets[i]
+            val to = targets[i + 1]
+
+            val segment = shortestPath(from, to)
+
+            Log.d(
+                "RouteOptimizer",
+                "PATH: $from -> $to = $segment"
+            )
+
+            if (fullRoute.isEmpty()) {
+                fullRoute.addAll(segment)
+            } else {
+                fullRoute.addAll(segment.drop(1))
+            }
+        }
+
+        Log.d("RouteOptimizer", "========== FINAL ROUTE ==========")
+
+        fullRoute.forEach {
+            Log.d("RouteOptimizer", it)
+        }
+
+        val steps = mutableListOf<RouteStep>()
+
+        val visitedSections = mutableSetOf<StoreSection>()
+
+        for (nodeId in fullRoute) {
+
+            val section = nodeIdToSection(nodeId)
+                ?: continue
+
+            if (section in visitedSections) {
+                continue
+            }
+
+            visitedSections.add(section)
+
+
+            val sectionItems = grouped[section]
+                ?: emptyList()
+
+            if (sectionItems.isEmpty()) {
+                steps.add(RouteStep.PassThrough(section))
+            } else {
+                steps.add(RouteStep.EnterSection(section))
+                sectionItems.forEach { steps.add(RouteStep.PickItem(it)) }
+            }
+
+        }
+
+        steps.add(
+            RouteStep.GoToCheckout(checkout)
+        )
+
+        steps.add(
+            RouteStep.Finish("EXIT")
+        )
+
+        val unrecognized = items.filter {
+            it.product == null && !it.checked
+        }
+
+        if (unrecognized.isNotEmpty()) {
+
+            steps.add(
+                RouteStep.AskStaff(unrecognized)
+            )
+        }
+
+        Log.d("RouteOptimizer", "========== ROUTE STEPS ==========")
+
+        steps.forEach {
+
+            when (it) {
+
+                is RouteStep.PassThrough -> {
+                    Log.d(
+                        "RouteOptimizer",
+                        "PASS THROUGH -> ${it.section.label}"
+                    )
+                }
+
+                is RouteStep.EnterSection -> {
+                    Log.d(
+                        "RouteOptimizer",
+                        "ENTER SECTION -> ${it.section.label}"
+                    )
+                }
+
+                is RouteStep.PickItem -> {
+                    Log.d(
+                        "RouteOptimizer",
+                        "PICK ITEM -> ${it.item.product?.name}"
+                    )
+                }
+
+                is RouteStep.GoToCheckout -> {
+                    Log.d(
+                        "RouteOptimizer",
+                        "GO TO -> ${it.checkoutId}"
+                    )
+                }
+
+                is RouteStep.Finish -> {
+                    Log.d(
+                        "RouteOptimizer",
+                        "FINISH -> ${it.exitId}"
+                    )
+                }
+
+                is RouteStep.AskStaff -> {
+                    Log.d(
+                        "RouteOptimizer",
+                        "ASK STAFF -> ${it.items.size} items"
+                    )
+                }
+            }
+        }
+
+        return OptimizedRoute(
+            path = fullRoute,
+            steps = steps
+        )
+    }
+
+    fun optimizeV1(items: List<ShoppingItem>): List<RouteStep> {
+
+        val grouped = groupItemsByStoreSection(items)
+
+        val requiredSections = grouped.keys
+
+        val visitOrder = orderedSections.filter {
+            it in requiredSections
+        }
+
+        val useCheckout2 = visitOrder.any {
+            it in checkout2Sections
+        }
+
+        val checkout = if (useCheckout2) {
+            "CHECKOUT2"
+        } else {
+            "CHECKOUT1"
+        }
+
+        val targets = mutableListOf<String>()
+
+        targets.add("ENTRANCE")
+
+        visitOrder.forEach { section ->
+
+            val nodeId = when (section) {
+                StoreSection.FRESHPRODUCTS -> "FRESHPRODUCTS1"
+                else -> section.name
+            }
+
+            targets.add(nodeId)
+        }
+
+        targets.add(checkout)
+
+        Log.d("RouteOptimizer", "========== TARGETS ==========")
+
+        targets.forEach {
+            Log.d("RouteOptimizer", it)
+        }
+
+        val fullRoute = mutableListOf<String>()
+
+        for (i in 0 until targets.size - 1) {
+
+            val from = targets[i]
+            val to = targets[i + 1]
+
+            val segment = shortestPath(from, to)
+
+            Log.d(
+                "RouteOptimizer",
+                "PATH: $from -> $to = $segment"
+            )
+
+            if (fullRoute.isEmpty()) {
+                fullRoute.addAll(segment)
+            } else {
+                fullRoute.addAll(segment.drop(1))
+            }
+        }
+
+        Log.d("RouteOptimizer", "========== FINAL ROUTE ==========")
+
+        fullRoute.forEach {
+            Log.d("RouteOptimizer", it)
+        }
+
+        return emptyList()
+    }
+
+
+
+    fun optimizeOG(items: List<ShoppingItem>): List<RouteStep> {
+
+
         val recognized = items
             .filter { it.product != null && !it.checked }
             .sortedBy { null}
@@ -209,7 +595,34 @@ object RouteOptimizer {
 }
 
 sealed class RouteStep {
-    data class GoToAisle(val corsia: Int, val sectionLabel: String) : RouteStep()
-    data class PickItem(val item: ShoppingItem) : RouteStep()
-    data class AskStaff(val items: List<ShoppingItem>) : RouteStep()
+
+    data class EnterSection(
+        val section: StoreSection
+    ) : RouteStep()
+
+    data class PassThrough(
+        val section: StoreSection
+    ) : RouteStep()
+
+
+    data class PickItem(
+        val item: ShoppingItem
+    ) : RouteStep()
+
+    data class GoToCheckout(
+        val checkoutId: String
+    ) : RouteStep()
+
+    data class Finish(
+        val exitId: String
+    ) : RouteStep()
+
+    data class AskStaff(
+        val items: List<ShoppingItem>
+    ) : RouteStep()
+}
+sealed class RouteStepOG {
+    data class GoToAisle(val corsia: Int, val sectionLabel: String) : RouteStepOG()
+    data class PickItem(val item: ShoppingItem) : RouteStepOG()
+    data class AskStaff(val items: List<ShoppingItem>) : RouteStepOG()
 }
