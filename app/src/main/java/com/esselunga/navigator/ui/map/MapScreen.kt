@@ -244,6 +244,7 @@ fun MapScreen(
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         drawRouteOverlay(
                             routePath     = routePath,
+                            pickSections  = route.pickSections,
                             currentNodeId = currentNodeId,
                             dashOffset    = dashOffset,
                             pulseScale    = pulseScale
@@ -255,11 +256,14 @@ fun MapScreen(
     }
 }
 
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Drawing logic
 // ─────────────────────────────────────────────────────────────────────────────
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRouteOverlay(
     routePath: List<String>,
+    pickSections : Set<String>,
     currentNodeId: String?,
     dashOffset: Float,
     pulseScale: Float
@@ -304,13 +308,12 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRouteOverlay(
 
     // ── 2. Draw stop dots at section nodes ────────────────────────────────
     for (nodeId in routePath) {
-        if (nodeId !in sectionNodes) continue
+        if (nodeId !in pickSections) continue   // ← filtre clau
         val offset = nodeOffset(nodeId) ?: continue
+        if (nodeId == currentNodeId) continue
 
-        if (nodeId == currentNodeId) continue  // drawn separately below
-
-        drawCircle(color = Color.White,   radius = 12f, center = offset)
-        drawCircle(color = StopColor,     radius = 10f, center = offset)
+        drawCircle(color = Color.White, radius = 12f, center = offset)
+        drawCircle(color = StopColor,   radius = 10f, center = offset)
     }
 
     // ── 3. Draw pulsing current-position dot ─────────────────────────────
