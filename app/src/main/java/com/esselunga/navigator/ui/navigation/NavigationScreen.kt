@@ -28,42 +28,65 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import com.esselunga.navigator.data.StoreSection
 import com.esselunga.navigator.util.RouteStep
+import com.esselunga.navigator.util.WalkDirection
+import com.esselunga.navigator.util.computeDirection
+import com.esselunga.navigator.util.indexOfSectionInPath
+import com.esselunga.navigator.util.sectionAisle
 import com.esselunga.navigator.viewmodel.ShoppingViewModel
 
 // ── Palette ───────────────────────────────────────────────────────────────────
-private val Green700           = Color(0xFF00843D)
-private val Green50            = Color(0xFFF0FAF4)
-private val Green100           = Color(0xFFE8F5E9)
-private val Green200           = Color(0xFFC8E6D0)
-private val Green600           = Color(0xFF4A7C5E)
-private val Green800           = Color(0xFF1B4332)
-private val CheckoutAmber      = Color.White
-private val CheckoutAmberBorder= Green200
-private val FinishBlue         = Color.White
-private val FinishBlueBorder   = Green200
+private val Green700 = Color(0xFF00843D)
+private val Green50  = Color(0xFFF0FAF4)
+private val Green100 = Color(0xFFE8F5E9)
+private val Green200 = Color(0xFFC8E6D0)
+private val Green600 = Color(0xFF4A7C5E)
+private val Green800 = Color(0xFF1B4332)
 
-// ── Step metadata ─────────────────────────────────────────────────────────────
+// ── Section display metadata ──────────────────────────────────────────────────
+private data class SectionDisplay(val label: String, val emoji: String)
+
+private fun displayFor(section: StoreSection): SectionDisplay = when (section) {
+    StoreSection.FRESHPRODUCTS -> SectionDisplay("Fresh products",  "🥦")
+    StoreSection.BAKERY        -> SectionDisplay("Bakery",          "🥖")
+    StoreSection.DAIRY         -> SectionDisplay("Dairy",           "🥛")
+    StoreSection.DELI          -> SectionDisplay("Deli counter",    "🍖")
+    StoreSection.MEAT          -> SectionDisplay("Meat",            "🥩")
+    StoreSection.FROZEN        -> SectionDisplay("Frozen foods",    "🧊")
+    StoreSection.BREAKFAST     -> SectionDisplay("Breakfast",       "🥣")
+    StoreSection.PASTA_RICE    -> SectionDisplay("Pasta & rice",    "🍝")
+    StoreSection.DISPENSA      -> SectionDisplay("Pantry",          "🫙")
+    StoreSection.PERSONAL_CARE -> SectionDisplay("Personal care",   "🧴")
+    StoreSection.CLEANING      -> SectionDisplay("Cleaning",        "🧹")
+    StoreSection.PET           -> SectionDisplay("Pet supplies",    "🐾")
+    StoreSection.DRINKS        -> SectionDisplay("Drinks",          "🧃")
+}
+
+// ── Step action pill metadata ─────────────────────────────────────────────────
 private data class StepMeta(
-    val badge: String,
+    val actionEmoji: String,
+    val actionLabel: String,
     val icon: ImageVector,
     val cardBackground: Color = Color.White,
     val cardBorder: Color     = Green200
 )
 
 private fun metaFor(step: RouteStep): StepMeta = when (step) {
-    is RouteStep.EnterSection  -> StepMeta("Go to", Icons.Default.ShoppingCart)
-    is RouteStep.PassThrough   -> StepMeta("Walk through", Icons.AutoMirrored.Filled.ArrowForward)
-    is RouteStep.PickItem      -> StepMeta("Pick up", Icons.Default.ShoppingCart)
-    is RouteStep.GoToCheckout  -> StepMeta("Head to checkout", Icons.Default.ShoppingCart, CheckoutAmber, CheckoutAmberBorder)
-    is RouteStep.AskStaff      -> StepMeta("Ask a staff member", Icons.Default.Person)
-    is RouteStep.Finish        -> StepMeta("All done!", Icons.Default.CheckCircle, FinishBlue, FinishBlueBorder)
+    is RouteStep.EnterSection  -> StepMeta("🛒", "Pick up items here", Icons.Default.ShoppingCart)
+    is RouteStep.PassThrough   -> StepMeta("🚶", "Walk through",       Icons.AutoMirrored.Filled.ArrowForward)
+    is RouteStep.PickItem      -> StepMeta("🛒", "Pick up items here", Icons.Default.ShoppingCart)
+    is RouteStep.GoToCheckout  -> StepMeta("💳", "Head to checkout",   Icons.Default.ShoppingCart, Color.White, Green200)
+    is RouteStep.AskStaff      -> StepMeta("🙋", "Ask a staff member", Icons.Default.Person)
+    is RouteStep.Finish        -> StepMeta("🎉", "End of the route",   Icons.Default.CheckCircle,  Color.White, Green200)
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -78,24 +101,24 @@ fun NavigationScreen(
 ) {
     val itemsState by viewModel.items.collectAsState()
 
-    // Filter PickItem steps — they appear inline inside their EnterSection card
     val route = remember(itemsState) {
         viewModel.route.steps.filter { it !is RouteStep.PickItem }
     }
     val fullRoute = remember(itemsState) {
         viewModel.route.steps
     }
+    val routePath = remember(itemsState) {
+        viewModel.route.path
+    }
 
     var currentStepIndex by remember { mutableIntStateOf(0) }
     val currentStep = route.getOrNull(currentStepIndex)
     val totalSteps  = route.size
 
-
     LaunchedEffect(currentStepIndex) {
         viewModel.setNavigationStep(currentStepIndex)
     }
 
-    // Items belonging to the current EnterSection
     val sectionItems = remember(currentStep, fullRoute) {
         if (currentStep !is RouteStep.EnterSection) return@remember emptyList()
         val idx = fullRoute.indexOfFirst {
@@ -107,12 +130,66 @@ fun NavigationScreen(
             .filterIsInstance<RouteStep.PickItem>()
     }
 
+    fun nodeToFriendlyLabel(nodeId: String): String? = when {
+        nodeId.startsWith("FRESHPRODUCTS") -> "Fresh products"
+        nodeId == "DELI"          -> "Deli counter"
+        nodeId == "MEAT"          -> "Meat"
+        nodeId == "BAKERY"        -> "Bakery"
+        nodeId == "DAIRY"         -> "Dairy (aisle 1)"
+        nodeId == "DISPENSA"      -> "Pantry (aisle 2)"
+        nodeId == "PASTA_RICE"    -> "Pasta & rice (aisle 3)"
+        nodeId == "BREAKFAST"     -> "Breakfast (aisle 4)"
+        nodeId == "PERSONAL_CARE" -> "Personal care (aisle 5)"
+        nodeId == "CLEANING"      -> "Cleaning (aisle 6)"
+        nodeId == "PET"           -> "Pet supplies (aisle 7)"
+        nodeId == "FROZEN"        -> "Frozen (aisle 10)"
+        nodeId == "DRINKS"        -> "Drinks (aisle 11)"
+        nodeId == "CHECKOUT1" -> "Checkout"
+        nodeId == "CHECKOUT2" -> "Checkout"
+        else -> null
+    }
+
+    // Compute direction + aisle for section-type steps
+    // Cambia el tipo de directionInfo a Triple:
+// (WalkDirection, aisle: Int?, waypointLabels: List<String>)
+    val directionInfo: Triple<WalkDirection, Int?, List<String>>? = remember(currentStep, routePath, currentStepIndex) {
+        val section = when (currentStep) {
+            is RouteStep.EnterSection -> currentStep.section
+            is RouteStep.PassThrough  -> currentStep.section
+            else -> null
+        } ?: return@remember null
+
+        val nodeIdx = indexOfSectionInPath(routePath, section)
+        if (nodeIdx < 0) return@remember null
+
+        // Nodos entre el paso actual y el destino
+        val fromIdx = if (currentStepIndex > 0) {
+            val prevSection = when (val prev = route.getOrNull(currentStepIndex - 1)) {
+                is RouteStep.EnterSection -> indexOfSectionInPath(routePath, prev.section)
+                is RouteStep.PassThrough  -> indexOfSectionInPath(routePath, prev.section)
+                else -> 0
+            }
+            if (prevSection >= 0) prevSection else 0
+        } else 0
+
+        val intermediateNodes = routePath
+            .subList(fromIdx.coerceAtLeast(0), nodeIdx.coerceAtMost(routePath.size))
+            .filter { it.startsWith("WALK_").not() } // solo zonas nombradas
+            .mapNotNull { nodeToFriendlyLabel(it) }
+            .distinct()
+
+        Triple(
+            computeDirection(routePath, nodeIdx),
+            sectionAisle[section],
+            intermediateNodes
+        )
+    }
+
     val progressFraction by animateFloatAsState(
         targetValue = if (totalSteps > 0) (currentStepIndex + 1f) / totalSteps else 0f,
         animationSpec = tween(durationMillis = 400),
         label = "progressAnim"
     )
-
 
     Scaffold(
         containerColor = Green50,
@@ -163,7 +240,6 @@ fun NavigationScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // ── Scrollable content ────────────────────────────────────────────
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -180,9 +256,10 @@ fun NavigationScreen(
 
                 if (currentStep != null) {
                     StepCard(
-                        step = currentStep,
-                        sectionItems = sectionItems,
-                        onToggleItem = { id -> viewModel.toggleChecked(id) }
+                        step          = currentStep,
+                        sectionItems  = sectionItems,
+                        directionInfo = directionInfo,
+                        onToggleItem  = { id -> viewModel.toggleChecked(id) }
                     )
                 } else {
                     FinishedCard()
@@ -191,13 +268,12 @@ fun NavigationScreen(
                 Spacer(Modifier.height(8.dp))
             }
 
-            // ── Fixed bottom buttons ──────────────────────────────────────────
             NavigationButtons(
                 currentIndex = currentStepIndex,
-                totalSteps = totalSteps,
-                onPrevious = { currentStepIndex-- },
-                onNext = { if (currentStepIndex < totalSteps - 1) currentStepIndex++ },
-                onFinish = onFinish
+                totalSteps   = totalSteps,
+                onPrevious   = { currentStepIndex-- },
+                onNext       = { if (currentStepIndex < totalSteps - 1) currentStepIndex++ },
+                onFinish     = onFinish
             )
         }
     }
@@ -205,11 +281,7 @@ fun NavigationScreen(
 
 // ── Progress header ────────────────────────────────────────────────────────────
 @Composable
-private fun ProgressHeader(
-    currentIndex: Int,
-    total: Int,
-    fraction: Float
-) {
+private fun ProgressHeader(currentIndex: Int, total: Int, fraction: Float) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             text = "Step ${currentIndex + 1} of $total",
@@ -238,9 +310,15 @@ private fun ProgressHeader(
 private fun StepCard(
     step: RouteStep,
     sectionItems: List<RouteStep.PickItem>,
+    directionInfo: Triple<WalkDirection, Int?, List<String>>?,   // ← tipo nuevo
     onToggleItem: (String) -> Unit
-) {
-    val meta = metaFor(step)
+){
+    val meta           = metaFor(step)
+    val sectionDisplay = when (step) {
+        is RouteStep.EnterSection -> displayFor(step.section)
+        is RouteStep.PassThrough  -> displayFor(step.section)
+        else                      -> null
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -250,36 +328,68 @@ private fun StepCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp)
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            StepTypeBadge(label = meta.badge, icon = meta.icon)
-
-            Spacer(Modifier.height(14.dp))
-
             val titleText = when (step) {
-                is RouteStep.EnterSection -> step.section.label
-                is RouteStep.PassThrough  -> step.section.label
+                is RouteStep.EnterSection -> sectionDisplay?.label ?: step.section.name
+                is RouteStep.PassThrough  -> sectionDisplay?.label ?: step.section.name
                 is RouteStep.PickItem     -> step.item.rawText
                 is RouteStep.GoToCheckout -> "Checkout"
-                is RouteStep.AskStaff     -> "A staff member"
+                is RouteStep.AskStaff     -> "Ask a staff member"
                 is RouteStep.Finish       -> "You're all done!"
             }
 
+            // Direction banner
+            if (directionInfo != null) {
+                Spacer(Modifier.height(20.dp))
+                DirectionBanner(
+                    direction = directionInfo.first,
+                    aisle     = directionInfo.second,
+                    waypoints = directionInfo.third
+                )
+
+                Spacer(Modifier.height(24.dp))
+            }
+
+
+            // Action pill
+            ActionPill(emoji = meta.actionEmoji, label = meta.actionLabel)
+
+            Spacer(Modifier.height(20.dp))
+
+            // Big section emoji  ← SUBE AQUÍ
+            val bigEmoji = sectionDisplay?.emoji ?: when (step) {
+                is RouteStep.GoToCheckout -> "💳"
+                is RouteStep.AskStaff     -> "🙋"
+                is RouteStep.Finish       -> "✅"
+                else                      -> ""
+            }
+            if (bigEmoji.isNotEmpty()) {
+                Text(text = bigEmoji, fontSize = 72.sp, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(8.dp))
+            }
+
+            // Section / step title
+
             Text(
                 text = titleText,
-                fontSize = 38.sp,
+                fontSize = 34.sp,
                 fontWeight = FontWeight.Bold,
                 color = Green800,
-                lineHeight = 44.sp
+                lineHeight = 40.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
 
-            // AskStaff: list items below the title
+
+            // 5 ── AskStaff item list
             if (step is RouteStep.AskStaff && step.items.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
                 step.items.forEach { item ->
                     Text(
                         text = "· ${item.rawText}",
-                        fontSize = 22.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Green800,
                         modifier = Modifier.padding(vertical = 4.dp)
@@ -287,28 +397,123 @@ private fun StepCard(
                 }
             }
 
-            // EnterSection: checklist below the title
+            // 6 ── EnterSection checklist
             if (sectionItems.isNotEmpty()) {
                 Spacer(Modifier.height(24.dp))
+                HorizontalDivider(color = Green200)
+                Spacer(Modifier.height(16.dp))
                 Text(
-                    text = "Pick up these items:",
+                    text = "Items to pick up:",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = Green600
+                    color = Green600,
+                    modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(10.dp))
                 sectionItems.forEach { pickStep ->
                     ChecklistRow(
-                        text      = pickStep.item.rawText,
-                        quantity  = pickStep.item.quantity,
-                        checked   = pickStep.item.checked,
-                        imageUrl  = pickStep.item.product?.image,
-                        onClick   = { onToggleItem(pickStep.item.id) }
+                        text     = pickStep.item.rawText,
+                        quantity = pickStep.item.quantity,
+                        checked  = pickStep.item.checked,
+                        imageUrl = pickStep.item.product?.image,
+                        onClick  = { onToggleItem(pickStep.item.id) }
                     )
                     Spacer(Modifier.height(10.dp))
                 }
             }
         }
+    }
+}
+
+// ── Direction banner ───────────────────────────────────────────────────────────
+// Dark green background makes it stand out from the rest of the card.
+// Large arrow emoji (48sp) is readable at a glance even without reading the label.
+// Aisle chip on the right connects to the physical signs in the store.
+@Composable
+private fun DirectionBanner(
+    direction: WalkDirection,
+    aisle: Int?,
+    waypoints: List<String> = emptyList()
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Green800)
+            .padding(horizontal = 20.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // 1 ── Waypoints PRIMERO (texto pequeño arriba)
+        if (waypoints.isNotEmpty()) {
+            Text(
+                text = "After " + waypoints.joinToString(" → "),
+                fontSize = 14.sp,
+                color = Color.White.copy(alpha = 0.85f),
+                lineHeight = 20.sp
+            )
+            HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
+        }
+
+        // 2 ── Flecha + label + chip de pasillo DESPUÉS
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = direction.emoji,
+                    fontSize = 48.sp,
+                    modifier = Modifier.semantics { contentDescription = direction.label }
+                )
+                Text(
+                    text = direction.label,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    lineHeight = 30.sp
+                )
+            }
+            if (aisle != null) {
+                Spacer(Modifier.width(12.dp))
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Green700)
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Text("Aisle", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Green200)
+                    Text("$aisle", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
+        }
+    }
+}
+
+// ── Action pill ────────────────────────────────────────────────────────────────
+@Composable
+private fun ActionPill(emoji: String, label: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Green100, RoundedCornerShape(99.dp))
+            .padding(horizontal = 20.dp, vertical = 10.dp)
+    ) {
+        Text(text = emoji, fontSize = 22.sp)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = label,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            color = Green800
+        )
     }
 }
 
@@ -318,57 +523,24 @@ private fun FinishedCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = FinishBlue),
-        border = androidx.compose.foundation.BorderStroke(1.5.dp, FinishBlueBorder),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, Green200),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
-            modifier = Modifier.padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(24.dp).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(
-                Icons.Default.CheckCircle,
-                contentDescription = null,
-                tint = Green700,
-                modifier = Modifier.size(52.dp)
-            )
-            Text(
-                "All done!",
-                fontSize = 38.sp,
-                fontWeight = FontWeight.Bold,
-                color = Green800
-            )
+            Text(text = "✅", fontSize = 72.sp)
+            Text("All done!", fontSize = 34.sp, fontWeight = FontWeight.Bold, color = Green800)
             Text(
                 "You can head to the exit.",
-                fontSize = 20.sp,
-                color = Green600
+                fontSize = 18.sp,
+                color = Green600,
+                textAlign = TextAlign.Center
             )
         }
-    }
-}
-
-// ── Step type badge ────────────────────────────────────────────────────────────
-@Composable
-private fun StepTypeBadge(label: String, icon: ImageVector) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier
-            .background(Green100, RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = Green700,
-            modifier = Modifier.size(18.dp)
-        )
-        Text(
-            text = label,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Green800
-        )
     }
 }
 
@@ -382,12 +554,11 @@ private fun ChecklistRow(
     imageUrl: String? = null,
     onClick: () -> Unit
 ) {
-    var showImageDialog by remember { mutableStateOf(false) }
+    var showDetailDialog by remember { mutableStateOf(false) }
 
-    // Full-screen image dialog
-    if (showImageDialog && !imageUrl.isNullOrBlank()) {
+    if (showDetailDialog) {
         Dialog(
-            onDismissRequest = { showImageDialog = false },
+            onDismissRequest = { showDetailDialog = false },
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
             Box(
@@ -395,102 +566,120 @@ private fun ChecklistRow(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.85f))
-                    .clickable { showImageDialog = false }
+                    .clickable { showDetailDialog = false }
             ) {
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = text,
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
                     modifier = Modifier
                         .fillMaxWidth(0.88f)
-                        .clip(RoundedCornerShape(20.dp))
+                        .clip(RoundedCornerShape(24.dp))
                         .background(Color.White)
-                )
-                // Tap to close hint
-                Text(
-                    text = "Tap to close",
-                    fontSize = 13.sp,
-                    color = Color.White.copy(alpha = 0.6f),
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 32.dp)
-                )
+                        .padding(24.dp)
+                ) {
+                    if (!imageUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = imageUrl,
+                            contentDescription = text,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0xFFF5F5F5))
+                        )
+                    }
+                    Text(
+                        text = text,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Green800,
+                        lineHeight = 30.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    if (quantity > 1) {
+                        Text("Quantity: $quantity", fontSize = 18.sp, color = Green600)
+                    }
+                    OutlinedButton(
+                        onClick = { showDetailDialog = false },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Green800),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, Green200),
+                        modifier = Modifier.fillMaxWidth().height(52.dp)
+                    ) {
+                        Text("Close", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
             }
         }
     }
+
+    val shortName = text.split(" ").take(2).joinToString(" ").replaceFirstChar { it.uppercase() }
+    val rowBackground  = if (checked) Green700    else Color(0xFFF8FDF9)
+    val rowBorderColor = if (checked) Green800    else Green200
+    val rowBorderWidth = if (checked) 2.5.dp      else 1.5.dp
+    val textColor      = if (checked) Color.White else Green800
+    val imageAlpha     = if (checked) 0.45f       else 1f
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (checked) Green100 else Color(0xFFF8FDF9))
-            .border(
-                width = 1.5.dp,
-                color = if (checked) Green700 else Green200,
-                shape = RoundedCornerShape(12.dp)
-            )
+            .clip(RoundedCornerShape(14.dp))
+            .background(rowBackground)
+            .border(width = rowBorderWidth, color = rowBorderColor, shape = RoundedCornerShape(14.dp))
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = { if (!imageUrl.isNullOrBlank()) showImageDialog = true },
-                onLongClickLabel = "View product image"
+                onLongClick = { showDetailDialog = true },
+                onLongClickLabel = "View product details"
             )
             .semantics { role = Role.Checkbox }
-            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
         Checkbox(
             checked = checked,
             onCheckedChange = { onClick() },
             modifier = Modifier
-                .size(32.dp)
+                .size(36.dp)
                 .semantics {
-                    contentDescription = if (checked) "$text — checked" else "$text — unchecked"
+                    contentDescription = if (checked) "$text — checked" else "$text — not checked"
                 },
             colors = CheckboxDefaults.colors(
-                checkedColor   = Green700,
+                checkedColor   = Color.White,
                 uncheckedColor = Green600,
-                checkmarkColor = Color.White
+                checkmarkColor = Green700
             )
         )
-
         Spacer(Modifier.width(12.dp))
-
-        // Product image thumbnail
         if (!imageUrl.isNullOrBlank()) {
             AsyncImage(
                 model = imageUrl,
-                contentDescription = null,
+                contentDescription = "View image of $shortName",
                 modifier = Modifier
-                    .size(52.dp)
+                    .size(48.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color.White),
-                alpha = if (checked) 0.4f else 1f
+                    .background(Color.White)
+                    .clickable { showDetailDialog = true },
+                alpha = imageAlpha
             )
             Spacer(Modifier.width(12.dp))
         }
-
         Text(
-            text = if (quantity > 1) "$text  ×$quantity" else text,
+            text = if (quantity > 1) "$shortName ×$quantity" else shortName,
             fontSize = 19.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = if (checked) Green600 else Green800,
+            fontWeight = FontWeight.Bold,
+            color = textColor,
             textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
-
-        if (quantity > 1) {
-            Spacer(Modifier.width(8.dp))
-            Box(
-                modifier = Modifier
-                    .background(Green200, RoundedCornerShape(99.dp))
-                    .padding(horizontal = 10.dp, vertical = 3.dp)
-            ) {
-                Text(
-                    text = "×$quantity",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Green800
-                )
-            }
+        IconButton(onClick = { showDetailDialog = true }, modifier = Modifier.size(36.dp)) {
+            Icon(
+                Icons.Default.Info,
+                contentDescription = "View details of $shortName",
+                tint = if (checked) Color.White.copy(alpha = 0.7f) else Green600,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
@@ -505,11 +694,8 @@ private fun NavigationButtons(
     onFinish: () -> Unit
 ) {
     val isLast = currentIndex == totalSteps - 1
-
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 16.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         if (currentIndex > 0) {
@@ -518,43 +704,34 @@ private fun NavigationButtons(
                 modifier = Modifier
                     .weight(1f)
                     .height(64.dp)
-                    .semantics { contentDescription = "Previous step" },
+                    .semantics { contentDescription = "Go back to previous step" },
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Green800),
                 border = androidx.compose.foundation.BorderStroke(1.5.dp, Green200)
             ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = null,
-                    modifier = Modifier.size(22.dp)
-                )
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Back", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
         }
-
         Button(
             onClick = if (isLast) onFinish else onNext,
             modifier = Modifier
-                .weight(1f)
+                .weight(if (currentIndex > 0) 1f else 2f)
                 .height(64.dp)
-                .semantics {
-                    contentDescription = if (isLast) "Finish shopping" else "Go to next step"
-                },
+                .semantics { contentDescription = if (isLast) "Finish shopping" else "Go to next step" },
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Green700)
         ) {
             Text(
-                text = if (isLast) "Done" else "Next",
+                text = if (isLast) "Done ✓" else "Next",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
-            Spacer(Modifier.width(8.dp))
-            Icon(
-                imageVector = if (isLast) Icons.Default.Check else Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = null,
-                modifier = Modifier.size(22.dp)
-            )
+            if (!isLast) {
+                Spacer(Modifier.width(8.dp))
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(22.dp))
+            }
         }
     }
 }
