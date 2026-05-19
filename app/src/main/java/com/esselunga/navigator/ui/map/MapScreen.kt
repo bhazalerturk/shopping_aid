@@ -85,6 +85,8 @@ private val nodeCoordinates: Map<String, Pair<Float, Float>> = mapOf(
     "WALK_27" to Pair(0.9091f, 0.7705f),
     "WALK_28" to Pair(0.9443f, 0.4866f),
     "WALK_29" to Pair(0.9471f, 0.6010f),
+    "WALK_30" to Pair(0.2137f, 0.3345f),
+
 
     // ── Sections ────────────────────────────────────
     "DELI"          to Pair(0.5698f, 0.3345f),

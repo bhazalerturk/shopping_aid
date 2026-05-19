@@ -81,8 +81,9 @@ private data class StepMeta(
 )
 
 private fun metaFor(step: RouteStep): StepMeta = when (step) {
-    is RouteStep.EnterSection  -> StepMeta("🛒", "Pick up items here", Icons.Default.ShoppingCart)
+    is RouteStep.EnterSection  -> StepMeta("🚶", "Get to section",     Icons.AutoMirrored.Filled.ArrowForward)
     is RouteStep.PassThrough   -> StepMeta("🚶", "Walk through",       Icons.AutoMirrored.Filled.ArrowForward)
+    is RouteStep.PickSection   -> StepMeta("🛒", "Pick up items here", Icons.Default.ShoppingCart)
     is RouteStep.PickItem      -> StepMeta("🛒", "Pick up items here", Icons.Default.ShoppingCart)
     is RouteStep.GoToCheckout  -> StepMeta("💳", "Head to checkout",   Icons.Default.ShoppingCart, Color.White, Green200)
     is RouteStep.AskStaff      -> StepMeta("🙋", "Ask a staff member", Icons.Default.Person)
@@ -101,33 +102,44 @@ fun NavigationScreen(
 ) {
     val itemsState by viewModel.items.collectAsState()
 
-    val route = remember(itemsState) {
-        viewModel.route.steps.filter { it !is RouteStep.PickItem }
+    // Construim la route expandida: EnterSection → PickSection (si té items)
+    val route: List<RouteStep> = remember(itemsState) {
+        val fullSteps = viewModel.route.steps
+        buildList {
+            var i = 0
+            while (i < fullSteps.size) {
+                val step = fullSteps[i]
+                when (step) {
+                    is RouteStep.EnterSection -> {
+                        add(step)
+                        // Recull tots els PickItem consecutius
+                        val pickItems = mutableListOf<RouteStep.PickItem>()
+                        var j = i + 1
+                        while (j < fullSteps.size && fullSteps[j] is RouteStep.PickItem) {
+                            pickItems.add(fullSteps[j] as RouteStep.PickItem)
+                            j++
+                        }
+                        if (pickItems.isNotEmpty()) {
+                            add(RouteStep.PickSection(step.section, pickItems))
+                        }
+                        i = j
+                    }
+                    is RouteStep.PickItem -> i++ // ja consumit dins EnterSection
+                    else -> { add(step); i++ }
+                }
+            }
+        }
     }
-    val fullRoute = remember(itemsState) {
-        viewModel.route.steps
-    }
-    val routePath = remember(itemsState) {
-        viewModel.route.path
-    }
+
+    val routePath = remember(itemsState) { viewModel.route.path }
 
     var currentStepIndex by remember { mutableIntStateOf(0) }
     val currentStep = route.getOrNull(currentStepIndex)
     val totalSteps  = route.size
+    val isLastStep  = currentStepIndex == totalSteps - 1
 
     LaunchedEffect(currentStepIndex) {
         viewModel.setNavigationStep(currentStepIndex)
-    }
-
-    val sectionItems = remember(currentStep, fullRoute) {
-        if (currentStep !is RouteStep.EnterSection) return@remember emptyList()
-        val idx = fullRoute.indexOfFirst {
-            it is RouteStep.EnterSection && it.section == currentStep.section
-        }
-        if (idx < 0) return@remember emptyList()
-        fullRoute.drop(idx + 1)
-            .takeWhile { it is RouteStep.PickItem }
-            .filterIsInstance<RouteStep.PickItem>()
     }
 
     fun nodeToFriendlyLabel(nodeId: String): String? = when {
@@ -144,15 +156,12 @@ fun NavigationScreen(
         nodeId == "PET"           -> "Pet supplies (aisle 7)"
         nodeId == "FROZEN"        -> "Frozen (aisle 10)"
         nodeId == "DRINKS"        -> "Drinks (aisle 11)"
-        nodeId == "CHECKOUT1" -> "Checkout"
-        nodeId == "CHECKOUT2" -> "Checkout"
+        nodeId == "CHECKOUT1"     -> "Checkout"
+        nodeId == "CHECKOUT2"     -> "Checkout"
         else -> null
     }
 
-    // Compute direction + aisle for section-type steps
-    // Cambia el tipo de directionInfo a Triple:
-// (WalkDirection, aisle: Int?, waypointLabels: List<String>)
-    val directionInfo: Triple<WalkDirection, Int?, List<String>>? = remember(currentStep, routePath, currentStepIndex) {
+    val directionInfo: Triple<WalkDirection, Int?, List<String>>? = remember(currentStepIndex, routePath) {
         val section = when (currentStep) {
             is RouteStep.EnterSection -> currentStep.section
             is RouteStep.PassThrough  -> currentStep.section
@@ -162,19 +171,20 @@ fun NavigationScreen(
         val nodeIdx = indexOfSectionInPath(routePath, section)
         if (nodeIdx < 0) return@remember null
 
-        // Nodos entre el paso actual y el destino
-        val fromIdx = if (currentStepIndex > 0) {
-            val prevSection = when (val prev = route.getOrNull(currentStepIndex - 1)) {
-                is RouteStep.EnterSection -> indexOfSectionInPath(routePath, prev.section)
-                is RouteStep.PassThrough  -> indexOfSectionInPath(routePath, prev.section)
-                else -> 0
+        // Busca el pas anterior que sigui EnterSection o PassThrough
+        val fromIdx = (currentStepIndex - 1 downTo 0)
+            .mapNotNull { i ->
+                when (val prev = route.getOrNull(i)) {
+                    is RouteStep.EnterSection -> indexOfSectionInPath(routePath, prev.section)
+                    is RouteStep.PassThrough  -> indexOfSectionInPath(routePath, prev.section)
+                    else -> null
+                }
             }
-            if (prevSection >= 0) prevSection else 0
-        } else 0
+            .firstOrNull { it >= 0 } ?: 0
 
         val intermediateNodes = routePath
             .subList(fromIdx.coerceAtLeast(0), nodeIdx.coerceAtMost(routePath.size))
-            .filter { it.startsWith("WALK_").not() } // solo zonas nombradas
+            .filter { !it.startsWith("WALK_") }
             .mapNotNull { nodeToFriendlyLabel(it) }
             .distinct()
 
@@ -185,11 +195,20 @@ fun NavigationScreen(
         )
     }
 
+    // Progress
     val progressFraction by animateFloatAsState(
-        targetValue = if (totalSteps > 0) (currentStepIndex + 1f) / totalSteps else 0f,
+        targetValue = if (totalSteps > 0) (currentStepIndex + 1).toFloat() / totalSteps else 0f,
         animationSpec = tween(durationMillis = 400),
         label = "progressAnim"
     )
+
+    fun handleNext() {
+        if (isLastStep) onFinish() else currentStepIndex++
+    }
+
+    fun handlePrev() {
+        if (currentStepIndex > 0) currentStepIndex--
+    }
 
     Scaffold(
         containerColor = Green50,
@@ -199,34 +218,17 @@ fun NavigationScreen(
                 navigationIcon = {
                     IconButton(
                         onClick = onBack,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .semantics { contentDescription = "Exit navigation" }
+                        modifier = Modifier.size(48.dp).semantics { contentDescription = "Exit navigation" }
                     ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = null,
-                            tint = Green800,
-                            modifier = Modifier.size(26.dp)
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Green800, modifier = Modifier.size(26.dp))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Green50),
                 actions = {
-                    IconButton(
-                        onClick = onHelp,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .semantics { contentDescription = "Help" }
-                    ) {
+                    IconButton(onClick = onHelp, modifier = Modifier.size(48.dp).semantics { contentDescription = "Help" }) {
                         Icon(Icons.Default.Info, contentDescription = null, tint = Green600, modifier = Modifier.size(24.dp))
                     }
-                    IconButton(
-                        onClick = onOpenMap,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .semantics { contentDescription = "View store map" }
-                    ) {
+                    IconButton(onClick = onOpenMap, modifier = Modifier.size(48.dp).semantics { contentDescription = "View store map" }) {
                         Icon(Icons.Default.LocationOn, contentDescription = null, tint = Green600, modifier = Modifier.size(24.dp))
                     }
                 }
@@ -250,14 +252,13 @@ fun NavigationScreen(
 
                 ProgressHeader(
                     currentIndex = currentStepIndex,
-                    total = totalSteps,
-                    fraction = progressFraction
+                    total        = totalSteps,
+                    fraction     = progressFraction
                 )
 
                 if (currentStep != null) {
                     StepCard(
-                        step          = currentStep,
-                        sectionItems  = sectionItems,
+                        step         = currentStep,
                         directionInfo = directionInfo,
                         onToggleItem  = { id -> viewModel.toggleChecked(id) }
                     )
@@ -269,11 +270,10 @@ fun NavigationScreen(
             }
 
             NavigationButtons(
-                currentIndex = currentStepIndex,
-                totalSteps   = totalSteps,
-                onPrevious   = { currentStepIndex-- },
-                onNext       = { if (currentStepIndex < totalSteps - 1) currentStepIndex++ },
-                onFinish     = onFinish
+                hasPrev    = currentStepIndex > 0,
+                isLast     = isLastStep,
+                onPrevious = ::handlePrev,
+                onNext     = ::handleNext
             )
         }
     }
@@ -309,14 +309,15 @@ private fun ProgressHeader(currentIndex: Int, total: Int, fraction: Float) {
 @Composable
 private fun StepCard(
     step: RouteStep,
-    sectionItems: List<RouteStep.PickItem>,
-    directionInfo: Triple<WalkDirection, Int?, List<String>>?,   // ← tipo nuevo
+    directionInfo: Triple<WalkDirection, Int?, List<String>>?,
     onToggleItem: (String) -> Unit
-){
-    val meta           = metaFor(step)
-    val sectionDisplay = when (step) {
+) {
+    val meta = metaFor(step)
+
+    val sectionDisplay: SectionDisplay? = when (step) {
         is RouteStep.EnterSection -> displayFor(step.section)
         is RouteStep.PassThrough  -> displayFor(step.section)
+        is RouteStep.PickSection  -> displayFor(step.section)
         else                      -> null
     }
 
@@ -334,31 +335,29 @@ private fun StepCard(
             val titleText = when (step) {
                 is RouteStep.EnterSection -> sectionDisplay?.label ?: step.section.name
                 is RouteStep.PassThrough  -> sectionDisplay?.label ?: step.section.name
+                is RouteStep.PickSection  -> sectionDisplay?.label ?: step.section.name
                 is RouteStep.PickItem     -> step.item.rawText
                 is RouteStep.GoToCheckout -> "Checkout"
                 is RouteStep.AskStaff     -> "Ask a staff member"
                 is RouteStep.Finish       -> "You're all done!"
             }
 
-            // Direction banner
-            if (directionInfo != null) {
+            // Direction banner — solo en EnterSection y PassThrough
+            if (directionInfo != null && step !is RouteStep.PickSection) {
                 Spacer(Modifier.height(20.dp))
                 DirectionBanner(
                     direction = directionInfo.first,
                     aisle     = directionInfo.second,
                     waypoints = directionInfo.third
                 )
-
                 Spacer(Modifier.height(24.dp))
             }
 
-
             // Action pill
             ActionPill(emoji = meta.actionEmoji, label = meta.actionLabel)
-
             Spacer(Modifier.height(20.dp))
 
-            // Big section emoji  ← SUBE AQUÍ
+            // Big emoji
             val bigEmoji = sectionDisplay?.emoji ?: when (step) {
                 is RouteStep.GoToCheckout -> "💳"
                 is RouteStep.AskStaff     -> "🙋"
@@ -370,8 +369,7 @@ private fun StepCard(
                 Spacer(Modifier.height(8.dp))
             }
 
-            // Section / step title
-
+            // Title
             Text(
                 text = titleText,
                 fontSize = 34.sp,
@@ -382,8 +380,7 @@ private fun StepCard(
                 modifier = Modifier.fillMaxWidth()
             )
 
-
-            // 5 ── AskStaff item list
+            // AskStaff list
             if (step is RouteStep.AskStaff && step.items.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
                 step.items.forEach { item ->
@@ -397,8 +394,8 @@ private fun StepCard(
                 }
             }
 
-            // 6 ── EnterSection checklist
-            if (sectionItems.isNotEmpty()) {
+            // PickSection checklist
+            if (step is RouteStep.PickSection) {
                 Spacer(Modifier.height(24.dp))
                 HorizontalDivider(color = Green200)
                 Spacer(Modifier.height(16.dp))
@@ -410,7 +407,7 @@ private fun StepCard(
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(10.dp))
-                sectionItems.forEach { pickStep ->
+                step.items.forEach { pickStep ->
                     ChecklistRow(
                         text     = pickStep.item.rawText,
                         quantity = pickStep.item.quantity,
@@ -426,9 +423,6 @@ private fun StepCard(
 }
 
 // ── Direction banner ───────────────────────────────────────────────────────────
-// Dark green background makes it stand out from the rest of the card.
-// Large arrow emoji (48sp) is readable at a glance even without reading the label.
-// Aisle chip on the right connects to the physical signs in the store.
 @Composable
 private fun DirectionBanner(
     direction: WalkDirection,
@@ -443,7 +437,6 @@ private fun DirectionBanner(
             .padding(horizontal = 20.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 1 ── Waypoints PRIMERO (texto pequeño arriba)
         if (waypoints.isNotEmpty()) {
             Text(
                 text = "After " + waypoints.joinToString(" → "),
@@ -454,7 +447,6 @@ private fun DirectionBanner(
             HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
         }
 
-        // 2 ── Flecha + label + chip de pasillo DESPUÉS
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -508,12 +500,7 @@ private fun ActionPill(emoji: String, label: String) {
     ) {
         Text(text = emoji, fontSize = 22.sp)
         Spacer(Modifier.width(8.dp))
-        Text(
-            text = label,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Bold,
-            color = Green800
-        )
+        Text(text = label, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Green800)
     }
 }
 
@@ -534,12 +521,7 @@ private fun FinishedCard() {
         ) {
             Text(text = "✅", fontSize = 72.sp)
             Text("All done!", fontSize = 34.sp, fontWeight = FontWeight.Bold, color = Green800)
-            Text(
-                "You can head to the exit.",
-                fontSize = 18.sp,
-                color = Green600,
-                textAlign = TextAlign.Center
-            )
+            Text("You can head to the exit.", fontSize = 18.sp, color = Green600, textAlign = TextAlign.Center)
         }
     }
 }
@@ -588,14 +570,7 @@ private fun ChecklistRow(
                                 .background(Color(0xFFF5F5F5))
                         )
                     }
-                    Text(
-                        text = text,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Green800,
-                        lineHeight = 30.sp,
-                        textAlign = TextAlign.Center
-                    )
+                    Text(text = text, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Green800, lineHeight = 30.sp, textAlign = TextAlign.Center)
                     if (quantity > 1) {
                         Text("Quantity: $quantity", fontSize = 18.sp, color = Green600)
                     }
@@ -613,7 +588,7 @@ private fun ChecklistRow(
         }
     }
 
-    val shortName = text.split(" ").take(2).joinToString(" ").replaceFirstChar { it.uppercase() }
+    val shortName      = text.split(" ").take(2).joinToString(" ").replaceFirstChar { it.uppercase() }
     val rowBackground  = if (checked) Green700    else Color(0xFFF8FDF9)
     val rowBorderColor = if (checked) Green800    else Green200
     val rowBorderWidth = if (checked) 2.5.dp      else 1.5.dp
@@ -638,11 +613,9 @@ private fun ChecklistRow(
         Checkbox(
             checked = checked,
             onCheckedChange = { onClick() },
-            modifier = Modifier
-                .size(36.dp)
-                .semantics {
-                    contentDescription = if (checked) "$text — checked" else "$text — not checked"
-                },
+            modifier = Modifier.size(36.dp).semantics {
+                contentDescription = if (checked) "$text — checked" else "$text — not checked"
+            },
             colors = CheckboxDefaults.colors(
                 checkedColor   = Color.White,
                 uncheckedColor = Green600,
@@ -687,18 +660,16 @@ private fun ChecklistRow(
 // ── Navigation buttons ────────────────────────────────────────────────────────
 @Composable
 private fun NavigationButtons(
-    currentIndex: Int,
-    totalSteps: Int,
+    hasPrev: Boolean,
+    isLast: Boolean,
     onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onFinish: () -> Unit
+    onNext: () -> Unit
 ) {
-    val isLast = currentIndex == totalSteps - 1
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        if (currentIndex > 0) {
+        if (hasPrev) {
             OutlinedButton(
                 onClick = onPrevious,
                 modifier = Modifier
@@ -715,9 +686,9 @@ private fun NavigationButtons(
             }
         }
         Button(
-            onClick = if (isLast) onFinish else onNext,
+            onClick = onNext,
             modifier = Modifier
-                .weight(if (currentIndex > 0) 1f else 2f)
+                .weight(if (hasPrev) 1f else 2f)
                 .height(64.dp)
                 .semantics { contentDescription = if (isLast) "Finish shopping" else "Go to next step" },
             shape = RoundedCornerShape(14.dp),

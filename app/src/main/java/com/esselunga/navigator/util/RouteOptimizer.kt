@@ -48,6 +48,7 @@ private val nodeCoordinates: Map<String, Pair<Float, Float>> = mapOf(
     "WALK_27"        to Pair(0.9091f, 0.7705f),
     "WALK_28"        to Pair(0.9443f, 0.4866f),
     "WALK_29"        to Pair(0.9471f, 0.6010f),
+    "WALK_30" to Pair(0.2137f, 0.3345f),
     "DELI"           to Pair(0.5698f, 0.3345f),
     "MEAT"           to Pair(1.0006f, 0.3794f),
     "BAKERY"         to Pair(0.9583f, 0.8031f),
@@ -121,7 +122,8 @@ val edges = listOf(
     Edge("FRESHPRODUCTS6", "WALK_2"),
     Edge("WALK_2",    "WALK_3"),
     Edge("WALK_3",    "CHECKOUT1"),
-    Edge("WALK_3",    "WALK_4"),
+    Edge("WALK_3",    "WALK_30"),
+    Edge("WALK_30",    "WALK_4"),
     Edge("WALK_3",    "DELI"),
     Edge("WALK_4",    "CHECKOUT1"),
     Edge("WALK_4",    "WALK_5"),
@@ -452,6 +454,7 @@ sealed class RouteStep {
     data class EnterSection(val section: StoreSection)      : RouteStep()
     data class PassThrough(val section: StoreSection)       : RouteStep()
     data class PickItem(val item: ShoppingItem)             : RouteStep()
+    data class PickSection(val section: StoreSection, val items: List<PickItem>) : RouteStep()
     data class GoToCheckout(val checkoutId: String)         : RouteStep()
     data class Finish(val exitId: String)                   : RouteStep()
     data class AskStaff(val items: List<ShoppingItem>)      : RouteStep()
