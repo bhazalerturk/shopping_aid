@@ -164,14 +164,16 @@ fun EasylungaApp(intent: Intent? = null) {
                 viewModel = shoppingViewModel,
                 onBack = { navController.popBackStack() },
                 onOpenMap = { navController.navigate(Routes.MAP) },
-                onHelp = { navController.navigate(Routes.HELP) }
+                onHelp = { navController.navigate(Routes.HELP) },
+                onFinish = { navController.popBackStack() }
             )
         }
         composable(Routes.MAP) {
             MapScreen(
-                viewModel = shoppingViewModel,
-                onBack = { navController.popBackStack() },
-                onHelp = { navController.navigate(Routes.HELP) }
+                route            = shoppingViewModel.route,
+                currentStepIndex = shoppingViewModel.currentNavigationStep,
+                onBack           = { navController.popBackStack() },
+                onHelp           = { navController.navigate(Routes.HELP) }
             )
         }
         composable(Routes.HELP) {
