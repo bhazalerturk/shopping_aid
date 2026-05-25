@@ -39,6 +39,13 @@ import com.esselunga.navigator.data.getAveragePriceForProductType
 import com.esselunga.navigator.data.isExpensiveForProductType
 import com.esselunga.navigator.viewmodel.ShoppingViewModel
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.draw.clip
+import coil.compose.AsyncImage
+import androidx.compose.material.icons.filled.Info
 
 private val EasylungaGreen = Color(0xFF00843D)
 private val WarningYellow = Color(0xFFF9A825)
@@ -65,7 +72,7 @@ private fun sectionColor(section: StoreSection?): Color = when (section) {
 
 
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ListScreen(
     viewModel: ShoppingViewModel,
@@ -271,68 +278,68 @@ fun ListScreen(
         )
     }
 
-        // ── Budget warning dialog ─────────────────────────────────────────────
-        if (showBudgetWarning) {
-            AlertDialog(
-                onDismissRequest = { showBudgetWarning = false },
-                shape = RoundedCornerShape(20.dp),
-                title = {
-                    Text("💸 This exceeds your budget!", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            "\"$budgetWarningProductName\" costs ${BudgetCalculator.formatEuro(budgetWarningItemPrice)} but you only have ${BudgetCalculator.formatEuro(budgetWarningRemaining)} left.",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            "Do you still want to add it?",
-                            fontSize = 16.sp
-                        )
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            showBudgetWarning = false
-                            val product = budgetWarningProduct
-                            // Continue with quantity and price checks
-                            if (wizardActive && product != null && product.suggestedPerDay > 0) {
-                                val suggestedQty = viewModel.getSuggestedQuantity(product)
-                                val existingQty = items.filter { it.product?.id == product.id }.sumOf { it.quantity }
-                                if (existingQty >= suggestedQty) {
-                                    quantityWarningName = budgetWarningProductName
-                                    quantityWarningRecommended = suggestedQty
-                                    quantityWarningCurrent = existingQty
-                                    quantityPendingProductName = budgetWarningProductName
-                                    quantityPendingProduct = product
-                                    quantityPendingIsIncrement = false
-                                    showQuantityWarning = true
-                                    return@Button
-                                }
-                            }
-                            if (product != null && isExpensiveForProductType(product.price, product.categoryId, inputText)) {
-                                pendingProductName = budgetWarningProductName
-                                pendingProduct = product
-                                pendingAvgPrice = getAveragePriceForProductType(product.categoryId, inputText)
-                                pendingCategoryName = getCategoryById(product.categoryId)?.displayName ?: product.categoryId
-                                showExpensiveDialog = true
-                            } else {
-                                viewModel.addItem(budgetWarningProductName)
-                                inputText = ""
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = DangerRed)
-                    ) { Text("✅ Yes, add anyway", fontSize = 15.sp) }
-                },
-                dismissButton = {
-                    OutlinedButton(onClick = { showBudgetWarning = false }) {
-                        Text("❌ No, go back", fontSize = 15.sp)
-                    }
+    // ── Budget warning dialog ─────────────────────────────────────────────
+    if (showBudgetWarning) {
+        AlertDialog(
+            onDismissRequest = { showBudgetWarning = false },
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text("💸 This exceeds your budget!", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "\"$budgetWarningProductName\" costs ${BudgetCalculator.formatEuro(budgetWarningItemPrice)} but you only have ${BudgetCalculator.formatEuro(budgetWarningRemaining)} left.",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "Do you still want to add it?",
+                        fontSize = 16.sp
+                    )
                 }
-            )
-        }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showBudgetWarning = false
+                        val product = budgetWarningProduct
+                        // Continue with quantity and price checks
+                        if (wizardActive && product != null && product.suggestedPerDay > 0) {
+                            val suggestedQty = viewModel.getSuggestedQuantity(product)
+                            val existingQty = items.filter { it.product?.id == product.id }.sumOf { it.quantity }
+                            if (existingQty >= suggestedQty) {
+                                quantityWarningName = budgetWarningProductName
+                                quantityWarningRecommended = suggestedQty
+                                quantityWarningCurrent = existingQty
+                                quantityPendingProductName = budgetWarningProductName
+                                quantityPendingProduct = product
+                                quantityPendingIsIncrement = false
+                                showQuantityWarning = true
+                                return@Button
+                            }
+                        }
+                        if (product != null && isExpensiveForProductType(product.price, product.categoryId, inputText)) {
+                            pendingProductName = budgetWarningProductName
+                            pendingProduct = product
+                            pendingAvgPrice = getAveragePriceForProductType(product.categoryId, inputText)
+                            pendingCategoryName = getCategoryById(product.categoryId)?.displayName ?: product.categoryId
+                            showExpensiveDialog = true
+                        } else {
+                            viewModel.addItem(budgetWarningProductName)
+                            inputText = ""
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DangerRed)
+                ) { Text("✅ Yes, add anyway", fontSize = 15.sp) }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showBudgetWarning = false }) {
+                    Text("❌ No, go back", fontSize = 15.sp)
+                }
+            }
+        )
+    }
 
     Scaffold(
         snackbarHost = {
@@ -426,124 +433,178 @@ fun ListScreen(
 
                 // Product preview cards
                 if (searchResults.isNotEmpty()) {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         searchResults.take(3).forEach { product ->
+                            val imageUrl = product.image
+                            var showSearchDetailDialog by remember { mutableStateOf(false) }
 
-                            val category = getCategoryById(product.categoryId)
-                            val color = sectionColor(category?.section)
-
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = color.copy(alpha = 0.10f)
-                                ),
-                                border = CardDefaults.outlinedCardBorder().copy(
-                                    width = 1.5.dp
-                                )
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .border(
-                                            1.5.dp,
-                                            color.copy(alpha = 0.4f),
-                                            RoundedCornerShape(12.dp)
-                                        )
-                                        .clickable {
-                                            if (wizardActive && product.suggestedPerDay > 0) {
-                                                val suggestedQty = viewModel.getSuggestedQuantity(product)
-                                                val existingQty = items.filter { it.product?.id == product.id }.sumOf { it.quantity }
-                                                if (existingQty >= suggestedQty) {
-                                                    quantityWarningName = product.name
-                                                    quantityWarningRecommended = suggestedQty
-                                                    quantityWarningCurrent = existingQty
-                                                    quantityPendingProductName = product.name
-                                                    quantityPendingProduct = product
-                                                    quantityPendingIsIncrement = false
-                                                    showQuantityWarning = true
-                                                    return@clickable
+                            // ── Detail dialog (igual que ShoppingItemRow) ──────────────────
+                            if (showSearchDetailDialog) {
+                                val color = sectionColor(getCategoryById(product.categoryId)?.section)
+                                Dialog(
+                                    onDismissRequest = { showSearchDetailDialog = false },
+                                    properties = DialogProperties(usePlatformDefaultWidth = false)
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(Color.Black.copy(alpha = 0.85f))
+                                            .clickable { showSearchDetailDialog = false }
+                                    ) {
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth(0.88f)
+                                                .clip(RoundedCornerShape(24.dp))
+                                                .background(Color.White)
+                                                .padding(24.dp)
+                                                .clickable(enabled = false) {}
+                                        ) {
+                                            if (!imageUrl.isNullOrBlank()) {
+                                                AsyncImage(
+                                                    model = imageUrl,
+                                                    contentDescription = product.name,
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .aspectRatio(1f)
+                                                        .clip(RoundedCornerShape(16.dp))
+                                                        .background(Color(0xFFF5F5F5))
+                                                )
+                                            } else {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .aspectRatio(1f)
+                                                        .clip(RoundedCornerShape(16.dp))
+                                                        .background(color.copy(alpha = 0.10f)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text("🛒", fontSize = 64.sp)
                                                 }
                                             }
-                                            if (isExpensiveForProductType(product.price, product.categoryId, inputText)) {
-                                                pendingProductName = product.name
-                                                pendingProduct = product
-                                                pendingAvgPrice = getAveragePriceForProductType(product.categoryId, inputText)
-                                                pendingCategoryName = getCategoryById(product.categoryId)?.displayName ?: product.categoryId
-                                                showExpensiveDialog = true
-                                            } else {
-                                                viewModel.addItem(product.name)
-                                                inputText = ""
+
+                                            Text(
+                                                text = product.name,
+                                                fontSize = 22.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = color,
+                                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                            )
+
+                                            val category = getCategoryById(product.categoryId)
+                                            if (category != null) {
+                                                Text(
+                                                    text = "Aisle ${category.corsia} · ${category.displayName}",
+                                                    fontSize = 15.sp,
+                                                    color = Color.Gray
+                                                )
+                                            }
+
+                                            if (product.price > 0) {
+                                                Text(
+                                                    text = "${BudgetCalculator.formatEuro(product.price)} per unit",
+                                                    fontSize = 16.sp,
+                                                    color = Color.Gray
+                                                )
+                                            }
+
+                                            // Botó Afegir (acció principal des del dialog)
+                                            Button(
+                                                onClick = {
+                                                    showSearchDetailDialog = false
+                                                    tryAddWithCheck(product.name, product)
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = color),
+                                                shape = RoundedCornerShape(12.dp),
+                                                modifier = Modifier.fillMaxWidth().height(52.dp)
+                                            ) {
+                                                Icon(Icons.Default.Add, contentDescription = null)
+                                                Spacer(Modifier.width(8.dp))
+                                                Text("Add to list", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                                            }
+
+                                            OutlinedButton(
+                                                onClick = { showSearchDetailDialog = false },
+                                                shape = RoundedCornerShape(12.dp),
+                                                border = androidx.compose.foundation.BorderStroke(1.5.dp, color.copy(alpha = 0.3f)),
+                                                modifier = Modifier.fillMaxWidth().height(52.dp)
+                                            ) {
+                                                Text("Close", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                                             }
                                         }
-                                        .padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
+                                    }
+                                }
+                            }
 
-                                    // Product image (placeholder)
-                                    Image(
-                                        painter = painterResource(android.R.drawable.ic_menu_gallery),
-                                        contentDescription = product.name,
-                                        modifier = Modifier.size(72.dp)
+                            // ── Card de recomanació ────────────────────────────────────────
+                            val rowBackground  = Color(0xFFF8FDF9)
+                            val rowBorderColor = Color(0xFFCCCCCC)
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(rowBackground)
+                                    .border(width = 1.dp, color = rowBorderColor, shape = RoundedCornerShape(14.dp))
+                                    .combinedClickable(
+                                        onClick = { tryAddWithCheck(product.name, product) },
+                                        onLongClick = { showSearchDetailDialog = true },
+                                        onLongClickLabel = "View product details"
                                     )
+                                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                            ) {
+                                if (!imageUrl.isNullOrBlank()) {
+                                    AsyncImage(
+                                        model = imageUrl,
+                                        contentDescription = product.name,
+                                        modifier = Modifier
+                                            .size(52.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color.White)
+                                            .clickable { showSearchDetailDialog = true }
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                }
 
-                                    Column(
-                                        modifier = Modifier.weight(1f)
-                                    ) {
+                                val shortName = product.name
+                                    .split(" ").take(2).joinToString(" ")
+                                    .replaceFirstChar { it.uppercase() }
 
-                                        Text(
-                                            text = product.name,
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = color
-                                        )
+                                Text(
+                                    text = shortName,
+                                    fontSize = 19.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
 
-                                        Spacer(Modifier.height(2.dp))
+                                IconButton(
+                                    onClick = { showSearchDetailDialog = true },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Info,
+                                        contentDescription = "Details of ${product.name}",
+                                        tint = Color(0xFFAAAAAA),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
 
-                                        Text(
-                                            text = buildString {
-                                                append("Aisle ${category?.corsia ?: "?"}")
-
-                                                category?.displayName?.let {
-                                                    append(" · $it")
-                                                }
-                                            },
-                                            fontSize = 12.sp,
-                                            color = Color.Gray
-                                        )
-
-                                        Spacer(Modifier.height(4.dp))
-
-                                        Text(
-                                            text = "${product.price} € each",
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = color
-                                        )
-                                    }
-
-                                    Button(
-                                        onClick = {
-                                            tryAddWithCheck(product.name, product)
-                                        },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = color
-                                        ),
-                                        shape = RoundedCornerShape(10.dp),
-                                        contentPadding = PaddingValues(
-                                            horizontal = 12.dp,
-                                            vertical = 6.dp
-                                        )
-                                    ) {
-                                        Text(
-                                            "Add",
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
+                                IconButton(
+                                    onClick = { tryAddWithCheck(product.name, product) },
+                                    modifier = Modifier.size(30.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Add,
+                                        contentDescription = "Add ${product.name}",
+                                        tint = EasylungaGreen,
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 }
                             }
                         }
@@ -716,6 +777,7 @@ fun ListScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ShoppingItemRow(
     item: ShoppingItem,
@@ -728,147 +790,258 @@ private fun ShoppingItemRow(
     onIncrement: () -> Unit,
     onDecrement: () -> Unit
 ) {
-    val color = sectionColor(null)
-    val priceColor = when {
-        item.checked                                      -> Color.Gray
-        budget > 0 && totalCost > budget                  -> DangerRed
-        else                                              -> color
-    }
-    val bgColor = when {
-        item.checked        -> Color(0xFFF5F5F5)
-        item.product == null -> Color(0xFFFFF3E0)
-        else                -> color.copy(alpha = 0.06f)
-    }
+    val shortName = item.rawText
+        .split(" ").take(2).joinToString(" ")
+        .replaceFirstChar { it.uppercase() }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = bgColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        // Colored left stripe
-        Row(Modifier.fillMaxWidth()) {
+    val imageUrl = item.product?.image
+
+    // Color único para todos — solo cambia si está marcado
+    val rowBackground  = if (item.checked) Color(0xFFE8F5E9) else Color(0xFFF8FDF9)
+    val rowBorderColor = if (item.checked) EasylungaGreen    else Color(0xFFCCCCCC)
+    val rowBorderWidth = if (item.checked) 2.dp              else 1.dp
+    val textColor      = if (item.checked) EasylungaGreen    else Color.Black
+    val imageAlpha     = if (item.checked) 0.45f             else 1f
+
+    var showDetailDialog by remember { mutableStateOf(false) }
+
+    // ── Detail dialog ──────────────────────────────────────────────────────
+    if (showDetailDialog) {
+        val color = sectionColor(item.product?.let { getCategoryById(it.categoryId)?.section })
+        Dialog(
+            onDismissRequest = { showDetailDialog = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
             Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .width(5.dp)
-                    .height(IntrinsicSize.Min)
-                    .background(
-                        if (item.checked) Color.LightGray else color,
-                        RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp)
-                    )
-                    .defaultMinSize(minHeight = 72.dp)
-            )
-            Column(Modifier.fillMaxWidth().padding(10.dp, 10.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    item.product?.let { product ->
-                        // Product image (placeholder)
-                        Image(
-                            painter = painterResource(android.R.drawable.ic_menu_gallery),
-                            contentDescription = product.name,
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.85f))
+                    .clickable { showDetailDialog = false }
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth(0.88f)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Color.White)
+                        .padding(24.dp)
+                        .clickable(enabled = false) {}
+                ) {
+                    if (!imageUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = imageUrl,
+                            contentDescription = item.rawText,
                             modifier = Modifier
-                                .size(80.dp)
-                                .padding(end = 10.dp)
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0xFFF5F5F5))
                         )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(color.copy(alpha = 0.10f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🛒", fontSize = 64.sp)
+                        }
                     }
 
-                    Checkbox(
-                        checked = item.checked,
-                        onCheckedChange = { onToggle() },
-                        colors = CheckboxDefaults.colors(checkedColor = color),
-                        modifier = Modifier.size(28.dp)
+                    Text(
+                        text = item.rawText,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = color,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
-                    Spacer(Modifier.width(6.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = item.rawText,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            textDecoration = if (item.checked) TextDecoration.LineThrough else null,
-                            color = if (item.checked) Color.Gray else Color.Black
-                        )
-                        if (item.product != null) {
-                            val category = getCategoryById(item.product.categoryId)
-                            Text(
-                                text = "Aisle ${category?.corsia} · ${category?.displayName}",
-                                fontSize = 12.sp,
-                                color = color
-                            )
-                        } else {
-                            Text(
-                                "Not recognized — ask staff",
-                                fontSize = 12.sp,
-                                color = Color(0xFFF57C00)
-                            )
-                        }
-                    }
-                    if (item.priceEuro > 0) {
-                        Text(
-                            BudgetCalculator.formatEuro(item.totalPrice),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = priceColor
-                        )
-                    }
-                    Spacer(Modifier.width(2.dp))
-                    IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = "Remove",
-                            tint = Color.LightGray,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
 
-                // Quantity row
-                if (!item.checked) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 68.dp, top = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedIconButton(
-                            onClick = onDecrement,
-                            modifier = Modifier.size(34.dp),
-                            enabled = item.quantity > 1,
-                            border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.5.dp)
-                        ) {
-                            Text("−", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = color)
-                        }
-                        Text(
-                            "${item.quantity}",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = color,
-                            modifier = Modifier.widthIn(min = 28.dp)
-                        )
-                        OutlinedIconButton(
-                            onClick = onIncrement,
-                            modifier = Modifier.size(34.dp),
-                            border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.5.dp)
-                        ) {
-                            Text("+", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = color)
-                        }
-                        if (item.priceEuro > 0 && item.quantity > 1) {
+                    item.product?.let { product ->
+                        val category = getCategoryById(product.categoryId)
+                        if (category != null) {
                             Text(
-                                "${BudgetCalculator.formatEuro(item.priceEuro)} each",
-                                fontSize = 12.sp,
+                                text = "Aisle ${category.corsia} · ${category.displayName}",
+                                fontSize = 15.sp,
                                 color = Color.Gray
                             )
                         }
-                        // Suggestion hint
-                        if (wizardActive && suggestedQty != null && suggestedQty != item.quantity) {
+                    }
+
+                    if (item.priceEuro > 0) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
                             Text(
-                                "💡 Suggested: $suggestedQty",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
+                                text = "${BudgetCalculator.formatEuro(item.priceEuro)} per unit",
+                                fontSize = 16.sp,
+                                color = Color.Gray
                             )
+                            if (item.quantity > 1) {
+                                Text(
+                                    text = "Total: ${BudgetCalculator.formatEuro(item.totalPrice)}",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = color
+                                )
+                            }
                         }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(20.dp)
+                    ) {
+                        OutlinedIconButton(
+                            onClick = onDecrement,
+                            modifier = Modifier.size(48.dp),
+                            enabled = item.quantity > 1,
+                            border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.5.dp)
+                        ) {
+                            Text("−", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = color)
+                        }
+                        Text(
+                            text = "${item.quantity}",
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = color,
+                            modifier = Modifier.widthIn(min = 40.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        OutlinedIconButton(
+                            onClick = onIncrement,
+                            modifier = Modifier.size(48.dp),
+                            border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.5.dp)
+                        ) {
+                            Text("+", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = color)
+                        }
+                    }
+
+                    if (wizardActive && suggestedQty != null && suggestedQty != item.quantity) {
+                        Text(
+                            "💡 Suggested: $suggestedQty",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.Gray
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = { showDetailDialog = false },
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, color.copy(alpha = 0.3f)),
+                        modifier = Modifier.fillMaxWidth().height(52.dp)
+                    ) {
+                        Text("Close", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
+        }
+    }
+
+    // ── Card en lista ──────────────────────────────────────────────────────
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(rowBackground)
+            .border(width = rowBorderWidth, color = rowBorderColor, shape = RoundedCornerShape(14.dp))
+            .combinedClickable(
+                onClick = { },
+                onLongClick = { showDetailDialog = true },
+                onLongClickLabel = "View product details"
+            )
+            .padding(horizontal = 14.dp, vertical = 12.dp)
+    ) {
+        // Imagen
+        if (!imageUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = "Image of $shortName",
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.White)
+                    .clickable { showDetailDialog = true },
+                alpha = imageAlpha
+            )
+            Spacer(Modifier.width(12.dp))
+        }
+
+        // Nombre — solo una vez, sin subtítulo
+        Text(
+            text = shortName,
+            fontSize = 19.sp,
+            fontWeight = FontWeight.Bold,
+            color = textColor,
+            textDecoration = if (item.checked) TextDecoration.LineThrough else null,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+
+        // Controles de cantidad (solo si no está marcado)
+        if (!item.checked) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                OutlinedIconButton(
+                    onClick = onDecrement,
+                    modifier = Modifier.size(30.dp),
+                    enabled = item.quantity > 1,
+                    border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp)
+                ) {
+                    Text("−", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = EasylungaGreen)
+                }
+                Text(
+                    "${item.quantity}",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = EasylungaGreen,
+                    modifier = Modifier.widthIn(min = 22.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                OutlinedIconButton(
+                    onClick = onIncrement,
+                    modifier = Modifier.size(30.dp),
+                    border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp)
+                ) {
+                    Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = EasylungaGreen)
+                }
+            }
+            Spacer(Modifier.width(4.dp))
+        }
+
+        // Info button
+        IconButton(
+            onClick = { showDetailDialog = true },
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                Icons.Default.Info,
+                contentDescription = "View details of $shortName",
+                tint = if (item.checked) EasylungaGreen.copy(alpha = 0.5f) else Color(0xFFAAAAAA),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        // Remove button
+        IconButton(
+            onClick = onRemove,
+            modifier = Modifier.size(30.dp)
+        ) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = "Remove $shortName",
+                tint = Color.LightGray,
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }
