@@ -133,7 +133,9 @@ fun NavigationScreen(
 
     val routePath = remember(itemsState) { viewModel.route.path }
 
-    var currentStepIndex by remember { mutableIntStateOf(0) }
+    var currentStepIndex by remember {
+        mutableIntStateOf(viewModel.currentNavigationStep)
+    }
     val currentStep = route.getOrNull(currentStepIndex)
     val totalSteps  = route.size
     val isLastStep  = currentStepIndex == totalSteps - 1
@@ -141,6 +143,7 @@ fun NavigationScreen(
     LaunchedEffect(currentStepIndex) {
         viewModel.setNavigationStep(currentStepIndex)
     }
+
 
     fun nodeToFriendlyLabel(nodeId: String): String? = when {
         nodeId.startsWith("FRESHPRODUCTS") -> "Fresh products"
@@ -203,8 +206,14 @@ fun NavigationScreen(
     )
 
     fun handleNext() {
-        if (isLastStep) onFinish() else currentStepIndex++
+        val callIsLast = currentStepIndex == totalSteps - 1
+        android.util.Log.d("NAV", "handleNext: currentStepIndex=$currentStepIndex callIsLast=$callIsLast isLatStep=$isLastStep")
+        if (callIsLast){
+            viewModel.setNavigationStep(0)
+            onFinish()
+        } else currentStepIndex++
     }
+
 
     fun handlePrev() {
         if (currentStepIndex > 0) currentStepIndex--
@@ -217,7 +226,10 @@ fun NavigationScreen(
                 title = {},
                 navigationIcon = {
                     IconButton(
-                        onClick = onBack,
+                        onClick = {
+                            viewModel.setNavigationStep(0)
+                            onBack()
+                        },
                         modifier = Modifier.size(48.dp).semantics { contentDescription = "Exit navigation" }
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Green800, modifier = Modifier.size(26.dp))
