@@ -103,12 +103,6 @@ fun HomeScreen(onStart: () -> Unit, onHelp: () -> Unit) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Text(
-                text = "or hold your phone near\nthe NFC tag at the entrance",
-                fontSize = 15.sp,
-                color = Color.Gray,
-                textAlign = TextAlign.Center
-            )
         }
     }
 }
