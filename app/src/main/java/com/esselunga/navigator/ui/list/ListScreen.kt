@@ -119,17 +119,6 @@ fun ListScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // Live preview of recognized product as user types
-    /*
-    val previewCategory: Product? = remember(inputText) {
-        if (inputText.length >= 2) findCategory(inputText) else null
-    }
-    val previewSuggestedQty: Int? = remember(previewCategory, days, people) {
-        previewCategory?.let { viewModel.getSuggestedQuantity(it) }
-    }
-
-     */
-
     val budgetStatus = BudgetCalculator.budgetStatus(totalCost, budget)
     val baseThemeColor = if (isCaregiverMode) CaregiverPurple else EasylungaGreen
     val progressColor by animateColorAsState(
@@ -275,68 +264,68 @@ fun ListScreen(
         )
     }
 
-        // ── Budget warning dialog ─────────────────────────────────────────────
-        if (showBudgetWarning) {
-            AlertDialog(
-                onDismissRequest = { showBudgetWarning = false },
-                shape = RoundedCornerShape(20.dp),
-                title = {
-                    Text("💸 This exceeds your budget!", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            "\"$budgetWarningProductName\" costs ${BudgetCalculator.formatEuro(budgetWarningItemPrice)} but you only have ${BudgetCalculator.formatEuro(budgetWarningRemaining)} left.",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            "Do you still want to add it?",
-                            fontSize = 16.sp
-                        )
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            showBudgetWarning = false
-                            val product = budgetWarningProduct
-                            // Continue with quantity and price checks
-                            if (wizardActive && product != null && product.suggestedPerDay > 0) {
-                                val suggestedQty = viewModel.getSuggestedQuantity(product)
-                                val existingQty = items.filter { it.product?.id == product.id }.sumOf { it.quantity }
-                                if (existingQty >= suggestedQty) {
-                                    quantityWarningName = budgetWarningProductName
-                                    quantityWarningRecommended = suggestedQty
-                                    quantityWarningCurrent = existingQty
-                                    quantityPendingProductName = budgetWarningProductName
-                                    quantityPendingProduct = product
-                                    quantityPendingIsIncrement = false
-                                    showQuantityWarning = true
-                                    return@Button
-                                }
-                            }
-                            if (product != null && isExpensiveForProductType(product.price, product.categoryId, inputText)) {
-                                pendingProductName = budgetWarningProductName
-                                pendingProduct = product
-                                pendingAvgPrice = getAveragePriceForProductType(product.categoryId, inputText)
-                                pendingCategoryName = getCategoryById(product.categoryId)?.displayName ?: product.categoryId
-                                showExpensiveDialog = true
-                            } else {
-                                viewModel.addItem(budgetWarningProductName)
-                                inputText = ""
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = DangerRed)
-                    ) { Text("✅ Yes, add anyway", fontSize = 15.sp) }
-                },
-                dismissButton = {
-                    OutlinedButton(onClick = { showBudgetWarning = false }) {
-                        Text("❌ No, go back", fontSize = 15.sp)
-                    }
+    // ── Budget warning dialog ─────────────────────────────────────────────
+    if (showBudgetWarning) {
+        AlertDialog(
+            onDismissRequest = { showBudgetWarning = false },
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text("💸 This exceeds your budget!", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "\"$budgetWarningProductName\" costs ${BudgetCalculator.formatEuro(budgetWarningItemPrice)} but you only have ${BudgetCalculator.formatEuro(budgetWarningRemaining)} left.",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "Do you still want to add it?",
+                        fontSize = 16.sp
+                    )
                 }
-            )
-        }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showBudgetWarning = false
+                        val product = budgetWarningProduct
+                        // Continue with quantity and price checks
+                        if (wizardActive && product != null && product.suggestedPerDay > 0) {
+                            val suggestedQty = viewModel.getSuggestedQuantity(product)
+                            val existingQty = items.filter { it.product?.id == product.id }.sumOf { it.quantity }
+                            if (existingQty >= suggestedQty) {
+                                quantityWarningName = budgetWarningProductName
+                                quantityWarningRecommended = suggestedQty
+                                quantityWarningCurrent = existingQty
+                                quantityPendingProductName = budgetWarningProductName
+                                quantityPendingProduct = product
+                                quantityPendingIsIncrement = false
+                                showQuantityWarning = true
+                                return@Button
+                            }
+                        }
+                        if (product != null && isExpensiveForProductType(product.price, product.categoryId, inputText)) {
+                            pendingProductName = budgetWarningProductName
+                            pendingProduct = product
+                            pendingAvgPrice = getAveragePriceForProductType(product.categoryId, inputText)
+                            pendingCategoryName = getCategoryById(product.categoryId)?.displayName ?: product.categoryId
+                            showExpensiveDialog = true
+                        } else {
+                            viewModel.addItem(budgetWarningProductName)
+                            inputText = ""
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DangerRed)
+                ) { Text("✅ Yes, add anyway", fontSize = 15.sp) }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showBudgetWarning = false }) {
+                    Text("❌ No, go back", fontSize = 15.sp)
+                }
+            }
+        )
+    }
 
     Scaffold(
         snackbarHost = {
@@ -575,15 +564,12 @@ fun ListScreen(
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(
                             onDone = {
-                                val match = searchResults.firstOrNull()
-
-                                if (match != null) {
-                                    tryAddWithCheck(match.name, match)
-                                } else {
+                                // ERROR ARREGLADO AQUÍ: se evalúa si inputText no está vacío antes de proceder
+                                if (inputText.isNotBlank()) {
+                                    val match = searchResults.firstOrNull()
                                     tryAddWithCheck(match?.name ?: inputText, match)
+                                    inputText = ""
                                 }
-
-                                inputText = ""
                             }
                         ),
                         shape = RoundedCornerShape(12.dp)
@@ -591,7 +577,6 @@ fun ListScreen(
                     IconButton(
                         onClick = {
                             val match = searchResults.firstOrNull()
-
                             tryAddWithCheck(match?.name ?: inputText, match)
                         },
                         modifier = Modifier.size(56.dp),
@@ -692,14 +677,18 @@ fun ListScreen(
             ) {
                 items(items, key = { it.id }) { item ->
                     val suggestedQty = item.product?.let { viewModel.getSuggestedQuantity(it) }
-                    val changeType = diff?.let {
-                        when {
-                            it.added.any { added -> added.item.id == item.id } -> "added"
-                            it.removed.any { removed -> removed.item.id == item.id } -> "removed"
-                            it.modified.any { mod -> mod.item.id == item.id } -> "modified"
-                            else -> null
+                    val changeType = diff?.let { listDiff ->
+                        listDiff.changes.find { change -> change.item.id == item.id }?.let { foundChange ->
+                            when (foundChange.changeType) {
+                                ItemChangeType.ADDED            -> "added"
+                                ItemChangeType.REMOVED           -> "removed"
+                                ItemChangeType.QUANTITY_CHANGED  -> "modified"
+                                else                            -> null
+                            }
                         }
                     }
+                    // ──────────────────────────────────────────────────────────────────────────
+
                     ShoppingItemRow(
                         item = item,
                         budget = budget,
@@ -721,7 +710,7 @@ fun ListScreen(
                             }
                         },
                         onDecrement = { viewModel.decrementQuantity(item.id) },
-                        changeType = changeType // <--- nuevo parámetro
+                        changeType = changeType
                     )
                 }
             }
@@ -740,7 +729,7 @@ private fun ShoppingItemRow(
     onRemove: () -> Unit,
     onIncrement: () -> Unit,
     onDecrement: () -> Unit,
-    changeType: String? = null // <--- nuevo parámetro
+    changeType: String? = null
 ) {
     val color = sectionColor(null)
     val priceColor = when {
@@ -889,4 +878,3 @@ private fun ShoppingItemRow(
         }
     }
 }
-
