@@ -162,12 +162,21 @@ fun MapScreen(
     // the pulsing dot. We look at the non-PickItem step at currentStepIndex.
     val currentNodeId: String? = remember(route.steps, currentStepIndex) {
         val step = route.steps.getOrNull(currentStepIndex) ?: return@remember null
-        when (step) {
-            is RouteStep.EnterSection -> step.section.name
+        when {
+            currentStepIndex == 0 -> "ENTRANCE"
+            step is RouteStep.EnterSection -> step.section.name
                 .let { if (it == "FRESHPRODUCTS") "FRESHPRODUCTS1" else it }
-            is RouteStep.PassThrough  -> step.section.name
-            is RouteStep.GoToCheckout -> step.checkoutId
-            is RouteStep.Finish       -> "EXIT"
+            step is RouteStep.PassThrough  -> step.section.name
+            step is RouteStep.PickItem -> {
+                // Busca l'EnterSection més proper anterior
+                val parentSection = route.steps
+                    .subList(0, currentStepIndex)
+                    .filterIsInstance<RouteStep.EnterSection>()
+                    .lastOrNull()?.section?.name
+                parentSection?.let { if (it == "FRESHPRODUCTS") "FRESHPRODUCTS1" else it }
+            }
+            step is RouteStep.GoToCheckout -> step.checkoutId
+            step is RouteStep.Finish       -> "EXIT"
             else                      -> null
         }
     }
@@ -336,9 +345,11 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRouteOverlay(
 
     // ── 4. Start / End markers ────────────────────────────────────────────
     routePath.firstOrNull()?.let { startId ->
-        nodeOffset(startId)?.let { o ->
-            drawCircle(color = EsselungaGreen.copy(alpha = 0.5f), radius = 18f, center = o)
-            drawCircle(color = EsselungaGreen,                    radius = 11f, center = o)
+        if (startId != currentNodeId) {
+            nodeOffset(startId)?.let { o ->
+                drawCircle(color = EsselungaGreen.copy(alpha = 0.5f), radius = 18f, center = o)
+                drawCircle(color = EsselungaGreen, radius = 11f, center = o)
+            }
         }
     }
     routePath.lastOrNull()?.let { endId ->
