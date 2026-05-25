@@ -21,7 +21,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navDeepLink
-import com.esselunga.navigator.ui.budget.BudgetScreen
 import com.esselunga.navigator.ui.caregiver.CreateCaregiverFromLinkScreen
 import com.esselunga.navigator.ui.caregiver_interface.CaregiverInterfaceScreen
 import com.esselunga.navigator.ui.diff.DiffScreen
@@ -110,7 +109,7 @@ fun EasylungaApp(intent: Intent? = null) {
 
     LaunchedEffect(nfcTrigger) {
         if (nfcTrigger > 0) {
-            navController.navigate(Routes.BUDGET) {
+            navController.navigate(Routes.WIZARD) {
                 popUpTo(Routes.HOME) { inclusive = false }
             }
         }
@@ -125,15 +124,8 @@ fun EasylungaApp(intent: Intent? = null) {
     NavHost(navController = navController, startDestination = Routes.HOME) {
         composable(Routes.HOME) {
             HomeScreen(
-                onStart = { navController.navigate(Routes.BUDGET) },
+                onStart = { navController.navigate(Routes.WIZARD) },
                 onHelp = { navController.navigate(Routes.HELP) }
-            )
-        }
-        composable(Routes.BUDGET) {
-            BudgetScreen(
-                viewModel = shoppingViewModel,
-                onNext = { navController.navigate(Routes.WIZARD) },
-                onSkip = { navController.navigate(Routes.WIZARD) }
             )
         }
         composable(Routes.WIZARD) {
