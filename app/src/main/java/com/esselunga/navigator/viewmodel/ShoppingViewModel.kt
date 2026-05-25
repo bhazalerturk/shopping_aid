@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.lifecycle.AndroidViewModel
 import com.esselunga.navigator.data.*
+import com.esselunga.navigator.data.local.ShoppingFileSystem
 import com.esselunga.navigator.util.BudgetCalculator
 import com.esselunga.navigator.util.RouteOptimizer
 import com.esselunga.navigator.util.RouteStep
@@ -22,6 +23,7 @@ import androidx.compose.runtime.mutableStateOf
 class ShoppingViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = application.getSharedPreferences("easylunga", Context.MODE_PRIVATE)
+    private val fileSystem = ShoppingFileSystem(application)
 
     // ── Shopping List ─────────────────────────────────────────────────────────
     private val _items = MutableStateFlow<List<ShoppingItem>>(emptyList())
@@ -239,5 +241,48 @@ class ShoppingViewModel(application: Application) : AndroidViewModel(application
         val name = prefs.getString("caregiver_name", null) ?: return null
         val phone = prefs.getString("caregiver_phone", null) ?: return null
         return CaregiverContact(name, phone)
+    }
+
+    // ── File System (Save/Load List) ─────────────────────────────────────────
+    fun saveListToFile() {
+        fileSystem.saveList(_items.value)
+    }
+
+    fun loadListFromFile() {
+        val loadedItems = fileSystem.loadList()
+        _items.value = loadedItems
+    }
+
+    fun loadListForCaregiver() {
+        loadListFromFile()
+    }
+
+    fun getListDiff(): ListDiff {
+        return fileSystem.getListDiff()
+    }
+
+    fun clearListDiff() {
+        fileSystem.clearOriginal()
+    }
+
+    // Guarda la lista original solo si no existe
+    fun saveOriginalListIfNeeded() {
+        fileSystem.saveList(_items.value)
+    }
+
+    // Guarda la lista modificada (del caregiver)
+    fun saveCurrentList() {
+        fileSystem.saveList(_items.value)
+    }
+
+    // Último diff calculado (para colorear la lista tras aceptar cambios)
+    private val _lastDiff = MutableStateFlow<ListDiff?>(null)
+    val lastDiff: StateFlow<ListDiff?> = _lastDiff.asStateFlow()
+
+    fun setLastDiff(diff: ListDiff?) {
+        _lastDiff.value = diff
+    }
+    fun clearLastDiff() {
+        _lastDiff.value = null
     }
 }

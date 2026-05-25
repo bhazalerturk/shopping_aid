@@ -46,6 +46,9 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.draw.clip
 import coil.compose.AsyncImage
 import androidx.compose.material.icons.filled.Info
+import com.esselunga.navigator.data.ListDiff
+import com.esselunga.navigator.data.ItemChange
+import com.esselunga.navigator.data.ItemChangeType
 
 private val EasylungaGreen = Color(0xFF00843D)
 private val WarningYellow = Color(0xFFF9A825)
@@ -80,7 +83,8 @@ fun ListScreen(
     onReview: () -> Unit,
     onAddWithWizard: () -> Unit,
     isCaregiverMode: Boolean = false,
-    onCaregiverDone: (() -> Unit)? = null
+    onCaregiverDone: (() -> Unit)? = null,
+    diff: ListDiff? = null
 ) {
     val items by viewModel.items.collectAsState()
     val budget by viewModel.budget.collectAsState()
@@ -121,17 +125,6 @@ fun ListScreen(
     }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-
-    // Live preview of recognized product as user types
-    /*
-    val previewCategory: Product? = remember(inputText) {
-        if (inputText.length >= 2) findCategory(inputText) else null
-    }
-    val previewSuggestedQty: Int? = remember(previewCategory, days, people) {
-        previewCategory?.let { viewModel.getSuggestedQuantity(it) }
-    }
-
-     */
 
     val budgetStatus = BudgetCalculator.budgetStatus(totalCost, budget)
     val baseThemeColor = if (isCaregiverMode) CaregiverPurple else EasylungaGreen
@@ -632,15 +625,12 @@ fun ListScreen(
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(
                             onDone = {
-                                val match = searchResults.firstOrNull()
-
-                                if (match != null) {
-                                    tryAddWithCheck(match.name, match)
-                                } else {
+                                // ERROR ARREGLADO AQUÍ: se evalúa si inputText no está vacío antes de proceder
+                                if (inputText.isNotBlank()) {
+                                    val match = searchResults.firstOrNull()
                                     tryAddWithCheck(match?.name ?: inputText, match)
+                                    inputText = ""
                                 }
-
-                                inputText = ""
                             }
                         ),
                         shape = RoundedCornerShape(12.dp)
@@ -648,7 +638,6 @@ fun ListScreen(
                     IconButton(
                         onClick = {
                             val match = searchResults.firstOrNull()
-
                             tryAddWithCheck(match?.name ?: inputText, match)
                         },
                         modifier = Modifier.size(56.dp),
@@ -749,6 +738,18 @@ fun ListScreen(
             ) {
                 items(items, key = { it.id }) { item ->
                     val suggestedQty = item.product?.let { viewModel.getSuggestedQuantity(it) }
+                    val changeType = diff?.let { listDiff ->
+                        listDiff.changes.find { change -> change.item.id == item.id }?.let { foundChange ->
+                            when (foundChange.changeType) {
+                                ItemChangeType.ADDED            -> "added"
+                                ItemChangeType.REMOVED           -> "removed"
+                                ItemChangeType.QUANTITY_CHANGED  -> "modified"
+                                else                            -> null
+                            }
+                        }
+                    }
+                    // ──────────────────────────────────────────────────────────────────────────
+
                     ShoppingItemRow(
                         item = item,
                         budget = budget,
@@ -769,7 +770,8 @@ fun ListScreen(
                                 viewModel.incrementQuantity(item.id)
                             }
                         },
-                        onDecrement = { viewModel.decrementQuantity(item.id) }
+                        onDecrement = { viewModel.decrementQuantity(item.id) },
+                        changeType = changeType
                     )
                 }
             }
@@ -788,7 +790,8 @@ private fun ShoppingItemRow(
     onToggle: () -> Unit,
     onRemove: () -> Unit,
     onIncrement: () -> Unit,
-    onDecrement: () -> Unit
+    onDecrement: () -> Unit,
+    changeType: String? = null
 ) {
     val shortName = item.rawText
         .split(" ").take(2).joinToString(" ")

@@ -24,6 +24,7 @@ import androidx.navigation.navDeepLink
 import com.esselunga.navigator.ui.budget.BudgetScreen
 import com.esselunga.navigator.ui.caregiver.CreateCaregiverFromLinkScreen
 import com.esselunga.navigator.ui.caregiver_interface.CaregiverInterfaceScreen
+import com.esselunga.navigator.ui.diff.DiffScreen
 import com.esselunga.navigator.ui.help.HelpScreen
 import com.esselunga.navigator.ui.home.HomeScreen
 import com.esselunga.navigator.ui.list.ListScreen
@@ -44,6 +45,7 @@ object Routes {
     const val HELP = "help"
     const val CREATE_CAREGIVER = "create_caregiver"
     const val CAREGIVER_INTERFACE = "caregiver_interface"
+    const val DIFF_SCREEN = "diff_screen"
 }
 
 class MainActivity : ComponentActivity() {
@@ -225,7 +227,27 @@ fun EasylungaApp(intent: Intent? = null) {
             CaregiverInterfaceScreen(
                 viewModel = shoppingViewModel,
                 listId = listId,
-                onListReady = { navController.navigate(Routes.LIST) }
+                onListReady = {
+                    navController.navigate(Routes.DIFF_SCREEN) {
+                        popUpTo(Routes.CAREGIVER_INTERFACE) { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable(Routes.DIFF_SCREEN) {
+            val diff = shoppingViewModel.getListDiff()
+            DiffScreen(
+                diff = diff,
+                onBack = {
+                    navController.popBackStack()
+                    shoppingViewModel.clearListDiff()
+                },
+                onAccept = {
+                    navController.navigate(Routes.REVIEW) {
+                        popUpTo(Routes.DIFF_SCREEN) { inclusive = true }
+                    }
+                    shoppingViewModel.clearListDiff()
+                }
             )
         }
     }
