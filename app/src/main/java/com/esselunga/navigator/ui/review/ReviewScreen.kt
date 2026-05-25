@@ -143,6 +143,7 @@ fun ReviewScreen(
                             Button(
                                 onClick = {
                                     val listId = "current"
+                                    viewModel.saveOriginalListIfNeeded()
                                     onOpenCaregiverInterface(listId)},
                                 modifier = Modifier.fillMaxWidth().height(50.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = EasylungaGreen),

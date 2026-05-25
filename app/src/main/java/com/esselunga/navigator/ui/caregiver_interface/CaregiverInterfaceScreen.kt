@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import com.esselunga.navigator.ui.list.ListScreen
 import com.esselunga.navigator.viewmodel.ShoppingViewModel
@@ -15,6 +16,10 @@ fun CaregiverInterfaceScreen(
     listId: String = "current",
     onListReady: () -> Unit
 ) {
+    LaunchedEffect(listId) {
+        viewModel.loadListForCaregiver()
+    }
+
     Box(Modifier.fillMaxSize()) {
         ListScreen(
             viewModel = viewModel,
@@ -22,7 +27,10 @@ fun CaregiverInterfaceScreen(
             onReview = { /* noop */ },
             onAddWithWizard = { /* noop */ },
             isCaregiverMode = true,
-            onCaregiverDone = onListReady
+            onCaregiverDone = {
+                viewModel.saveCurrentList()
+                onListReady()
+            }
         )
     }
 }
