@@ -39,6 +39,9 @@ import com.esselunga.navigator.data.getAveragePriceForProductType
 import com.esselunga.navigator.data.isExpensiveForProductType
 import com.esselunga.navigator.viewmodel.ShoppingViewModel
 import kotlinx.coroutines.launch
+import com.esselunga.navigator.data.ListDiff
+import com.esselunga.navigator.data.ItemChange
+import com.esselunga.navigator.data.ItemChangeType
 
 private val EasylungaGreen = Color(0xFF00843D)
 private val WarningYellow = Color(0xFFF9A825)
@@ -73,7 +76,8 @@ fun ListScreen(
     onReview: () -> Unit,
     onAddWithWizard: () -> Unit,
     isCaregiverMode: Boolean = false,
-    onCaregiverDone: (() -> Unit)? = null
+    onCaregiverDone: (() -> Unit)? = null,
+    diff: ListDiff? = null
 ) {
     val items by viewModel.items.collectAsState()
     val budget by viewModel.budget.collectAsState()
@@ -688,6 +692,14 @@ fun ListScreen(
             ) {
                 items(items, key = { it.id }) { item ->
                     val suggestedQty = item.product?.let { viewModel.getSuggestedQuantity(it) }
+                    val changeType = diff?.let {
+                        when {
+                            it.added.any { added -> added.item.id == item.id } -> "added"
+                            it.removed.any { removed -> removed.item.id == item.id } -> "removed"
+                            it.modified.any { mod -> mod.item.id == item.id } -> "modified"
+                            else -> null
+                        }
+                    }
                     ShoppingItemRow(
                         item = item,
                         budget = budget,
@@ -708,7 +720,8 @@ fun ListScreen(
                                 viewModel.incrementQuantity(item.id)
                             }
                         },
-                        onDecrement = { viewModel.decrementQuantity(item.id) }
+                        onDecrement = { viewModel.decrementQuantity(item.id) },
+                        changeType = changeType // <--- nuevo parámetro
                     )
                 }
             }
@@ -726,7 +739,8 @@ private fun ShoppingItemRow(
     onToggle: () -> Unit,
     onRemove: () -> Unit,
     onIncrement: () -> Unit,
-    onDecrement: () -> Unit
+    onDecrement: () -> Unit,
+    changeType: String? = null // <--- nuevo parámetro
 ) {
     val color = sectionColor(null)
     val priceColor = when {
@@ -735,9 +749,12 @@ private fun ShoppingItemRow(
         else                                              -> color
     }
     val bgColor = when {
-        item.checked        -> Color(0xFFF5F5F5)
-        item.product == null -> Color(0xFFFFF3E0)
-        else                -> color.copy(alpha = 0.06f)
+        changeType == "added"    -> Color(0xFFD0F5E8) // verde claro
+        changeType == "removed"  -> Color(0xFFFFD6D6) // rojo claro
+        changeType == "modified" -> Color(0xFFFFF9C4) // amarillo claro
+        item.checked             -> Color(0xFFF5F5F5)
+        item.product == null     -> Color(0xFFFFF3E0)
+        else                     -> color.copy(alpha = 0.06f)
     }
 
     Card(
@@ -872,3 +889,4 @@ private fun ShoppingItemRow(
         }
     }
 }
+
