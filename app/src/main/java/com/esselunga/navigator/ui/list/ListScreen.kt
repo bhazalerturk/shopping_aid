@@ -635,23 +635,6 @@ fun ListScreen(
                         ),
                         shape = RoundedCornerShape(12.dp)
                     )
-                    IconButton(
-                        onClick = {
-                            val match = searchResults.firstOrNull()
-                            tryAddWithCheck(match?.name ?: inputText, match)
-                        },
-                        modifier = Modifier.size(56.dp),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (isCaregiverMode) baseThemeColor else EasylungaGreen
-                        )
-                    ) {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = "Add",
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
                 }
 
                 if (!isCaregiverMode) {
