@@ -167,7 +167,7 @@ val PRODUCTS = listOf(
     Product(id="Esselunga Naturama Insalata mista 250 g",name="Esselunga Naturama Insalata mista 250 g",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/755436.jpg",price =3.92 ,keywords = listOf(),categoryId ="verdura",suggestedPerDay = 0.5),
     Product(id="Esselunga Naturama Pomodoro miniplum 350 g",name="Esselunga Naturama Pomodoro miniplum 350 g",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/763776.jpg",price =8.52 ,keywords = listOf(),categoryId ="verdura",suggestedPerDay = 0.5),
     Product(id="Esselunga Naturama Pomodorini colorati 300 g",name="Esselunga Naturama Pomodorini colorati 300 g",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/763729.jpg",price =8.61 ,keywords = listOf(),categoryId ="verdura",suggestedPerDay = 0.5),
-    Product(id="Esselunga Mista e germogli 100 g",name="Esselunga Mista e germogli 100 g",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/755437.jpg",price =9.80 ,keywords = listOf(),categoryId ="verdura",suggestedPerDay = 0.5),
+    Product(id="Esselunga pMista e germogli 100 g",name="Esselunga Mista e germogli 100 g",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/755437.jpg",price =9.80 ,keywords = listOf(),categoryId ="verdura",suggestedPerDay = 0.5),
     Product(id="Esselunga Naturama Valeriana 200 g",name="Esselunga Naturama Valeriana 200 g",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/755821.jpg",price =9.90 ,keywords = listOf(),categoryId ="verdura",suggestedPerDay = 0.5),
     Product(id="Esselunga Naturama Misticanza 125 g",name="Esselunga Naturama Misticanza 125 g",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/755431.jpg",price =7.84 ,keywords = listOf(),categoryId ="verdura",suggestedPerDay = 0.5),
     Product(id="Esselunga Naturama Carote tagliate 200 g",name="Esselunga Naturama Carote tagliate 200 g",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/755170.jpg",price =4.90 ,keywords = listOf(),categoryId ="verdura",suggestedPerDay = 0.5),
@@ -1098,6 +1098,31 @@ val PRODUCTS = listOf(
     Product(id="Ferrero Rocher Gelato 3 x 63,5 g",name="Ferrero Rocher Gelato 3 x 63,5 g",image="https://images.services.esselunga.it/html/img_prodotti/esselunga/medium2/608315.jpg",price =21.01,keywords = listOf(),categoryId = "gelati",suggestedPerDay = 0.5)
 )
 
+
+val ITALIAN_BASIC_DIET = listOf(
+    "Banane",
+    "Esselunga Naturama mele Golden confezionate",
+    "Pere William's confezionate",
+    "Esselunga Bio arance Valencia biologiche 1 kg",
+    "Esselunga limoni confezionati 1 kg",
+    "Esselunga Bio pomodorini grappolo biologici 500 g",
+    "Zucchine",
+    "Pelosi S. & C. s.r.l. Carote 1 kg",
+    "Esselunga Patate novelle 1,5 kg",
+    "Barilla Pasta Spaghettini n.3 1Kg",
+    "Esselunga Penne rigate pasta di semola di grano duro n.19 1000 g",
+    "Esselunga Riso Basmati rapido 250 g",
+    "Esselunga Parmigiano Reggiano DOP stagionatura oltre 22 mesi grattugiato 100 g",
+    "Mandara Mozzarella di Bufala Campana DOP 3 x 100 g",
+    "Esselunga Ricotta 250 g",
+    "Esselunga Naturama Pomodoro datterino 250 g",
+    "Esselunga, basilico in vaso diam. 14 cm",
+    "Esselunga Yogurt greco 0% grassi bianco 1 kg"
+)
+
+fun getItalianDietProducts(): List<Product> {
+    return PRODUCTS.filter { it.name in ITALIAN_BASIC_DIET }
+}
 
 fun findProduct(query: String): Product? {
     val q = query.lowercase().trim()

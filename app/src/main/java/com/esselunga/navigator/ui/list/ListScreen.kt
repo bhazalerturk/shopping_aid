@@ -46,9 +46,11 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.draw.clip
 import coil.compose.AsyncImage
 import androidx.compose.material.icons.filled.Info
+import com.esselunga.navigator.data.ITALIAN_BASIC_DIET
 import com.esselunga.navigator.data.ListDiff
 import com.esselunga.navigator.data.ItemChange
 import com.esselunga.navigator.data.ItemChangeType
+import com.esselunga.navigator.data.PRODUCTS
 
 private val EasylungaGreen = Color(0xFF00843D)
 private val WarningYellow = Color(0xFFF9A825)
@@ -71,6 +73,12 @@ private fun sectionColor(section: StoreSection?): Color = when (section) {
     StoreSection.CLEANING     -> Color(0xFF546E7A)
     StoreSection.PET          -> Color(0xFF6D4C41)
     null                      -> Color(0xFFF57C00)
+}
+
+private fun getRecommendedProducts(): List<Product> {
+    return PRODUCTS.filter {
+        it.name in ITALIAN_BASIC_DIET
+    }
 }
 
 
@@ -121,6 +129,15 @@ fun ListScreen(
             searchProducts(inputText)
         } else {
             emptyList()
+        }
+    }
+    var showRecommendations by remember {
+        mutableStateOf(false)
+    }
+
+    val recommendedProducts = remember {
+        mutableStateListOf<Product>().apply {
+            addAll(getRecommendedProducts())
         }
     }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -424,10 +441,25 @@ fun ListScreen(
                     }
                 }
 
+                val productsToShow = when {
+                    showRecommendations && inputText.isBlank() -> recommendedProducts.take(3)
+                    searchResults.isNotEmpty() -> searchResults.take(3)
+                    else -> emptyList()
+                }
+
+
                 // Product preview cards
-                if (searchResults.isNotEmpty()) {
+                if (productsToShow.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        searchResults.take(3).forEach { product ->
+                        Text(
+                            text = if (showRecommendations) "✨ You may like..." else "🔍 Results",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+                        )
+
+                        productsToShow.forEach { product ->
                             val imageUrl = product.image
                             var showSearchDetailDialog by remember { mutableStateOf(false) }
 
@@ -543,7 +575,23 @@ fun ListScreen(
                                     .background(rowBackground)
                                     .border(width = 1.dp, color = rowBorderColor, shape = RoundedCornerShape(14.dp))
                                     .combinedClickable(
-                                        onClick = { tryAddWithCheck(product.name, product) },
+                                        onClick = {
+                                            tryAddWithCheck(product.name, product)
+
+                                            recommendedProducts.remove(product)
+
+                                            val replacement = PRODUCTS
+                                                .shuffled()
+                                                .firstOrNull {
+                                                    it.id != product.id &&
+                                                            recommendedProducts.none { p -> p.id == it.id } &&
+                                                            items.none { item -> item.product?.id == it.id }
+                                                }
+
+                                            if (replacement != null) {
+                                                recommendedProducts.add(replacement)
+                                            }
+                                        },
                                         onLongClick = { showSearchDetailDialog = true },
                                         onLongClickLabel = "View product details"
                                     )
@@ -589,7 +637,23 @@ fun ListScreen(
                                 }
 
                                 IconButton(
-                                    onClick = { tryAddWithCheck(product.name, product) },
+                                    onClick = {
+                                        tryAddWithCheck(product.name, product)
+
+                                        recommendedProducts.remove(product)
+
+                                        val replacement = PRODUCTS
+                                            .shuffled()
+                                            .firstOrNull {
+                                                it.id != product.id &&
+                                                        recommendedProducts.none { p -> p.id == it.id } &&
+                                                        items.none { item -> item.product?.id == it.id }
+                                            }
+
+                                        if (replacement != null) {
+                                            recommendedProducts.add(replacement)
+                                        }
+                                    },
                                     modifier = Modifier.size(30.dp)
                                 ) {
                                     Icon(
@@ -641,9 +705,11 @@ fun ListScreen(
                     // Action buttons (user mode)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
-                            onClick = onAddWithWizard,
+                            onClick = {showRecommendations = !showRecommendations
+                                inputText = ""},
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.weight(1f).height(52.dp),
-                            shape = RoundedCornerShape(12.dp)
+
                         ) {
                             Text("🧙 Wizard", fontSize = 15.sp)
                         }
@@ -703,7 +769,8 @@ fun ListScreen(
                     Text("🛒", fontSize = 72.sp)
                     Spacer(Modifier.height(4.dp))
                     OutlinedButton(
-                        onClick = onAddWithWizard,
+                        onClick = {showRecommendations = !showRecommendations
+                                  inputText = ""},
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text("🧙 Use the Wizard for suggestions")
@@ -794,6 +861,8 @@ private fun ShoppingItemRow(
     // ── Detail dialog ──────────────────────────────────────────────────────
     if (showDetailDialog) {
         val color = sectionColor(item.product?.let { getCategoryById(it.categoryId)?.section })
+
+
         Dialog(
             onDismissRequest = { showDetailDialog = false },
             properties = DialogProperties(usePlatformDefaultWidth = false)
