@@ -502,10 +502,10 @@ private fun StepCard(
             // Title
             Text(
                 text = titleText,
-                fontSize = 34.sp,
+                fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
                 color = Green800,
-                lineHeight = 40.sp,
+                lineHeight = 34.sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -531,9 +531,9 @@ private fun StepCard(
                 Spacer(Modifier.height(16.dp))
                 Text(
                     text = "Items to pick up:",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Green600,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Green800,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(10.dp))
@@ -636,11 +636,11 @@ private fun ActionPill(emoji: String, label: String) {
         modifier = Modifier
             .fillMaxWidth()
             .background(Green100, RoundedCornerShape(99.dp))
-            .padding(horizontal = 20.dp, vertical = 10.dp)
+            .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
-        Text(text = emoji, fontSize = 22.sp)
+        Text(text = emoji, fontSize = 24.sp)
         Spacer(Modifier.width(8.dp))
-        Text(text = label, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Green800)
+        Text(text = label, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Green800)
     }
 }
 
