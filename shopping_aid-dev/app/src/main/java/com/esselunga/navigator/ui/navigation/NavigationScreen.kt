@@ -43,6 +43,7 @@ import com.esselunga.navigator.util.computeDirection
 import com.esselunga.navigator.util.indexOfSectionInPath
 import com.esselunga.navigator.util.sectionAisle
 import com.esselunga.navigator.viewmodel.ShoppingViewModel
+import androidx.compose.ui.draw.rotate
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 private val Green700 = Color(0xFF00843D)
@@ -132,7 +133,9 @@ fun NavigationScreen(
     }
 
     val routePath = remember(itemsState) { viewModel.route.path }
-
+    var showUncheckedReminder by remember { mutableStateOf(false) }
+    var uncheckedItemsList by remember { mutableStateOf<List<String>>(emptyList()) }
+    var showWeighReminder by remember { mutableStateOf(false) }
     var currentStepIndex by remember {
         mutableIntStateOf(viewModel.currentNavigationStep)
     }
@@ -207,8 +210,31 @@ fun NavigationScreen(
 
     fun handleNext() {
         val callIsLast = currentStepIndex == totalSteps - 1
-        android.util.Log.d("NAV", "handleNext: currentStepIndex=$currentStepIndex callIsLast=$callIsLast isLatStep=$isLastStep")
-        if (callIsLast){
+        val currStep = route.getOrNull(currentStepIndex)
+
+        // Check for unchecked items in PickSection
+        if (currStep is RouteStep.PickSection) {
+            // Get fresh checked state from current items state
+            val freshItems = currStep.items.mapNotNull { pickItem ->
+                itemsState.find { it.id == pickItem.item.id }
+            }
+            val uncheckedItems = freshItems.filter { !it.checked }
+            if (uncheckedItems.isNotEmpty()) {
+                uncheckedItemsList = uncheckedItems.map { it.rawText }
+                showUncheckedReminder = true
+                return
+            }
+        }
+
+        val isFreshProducts = currStep is RouteStep.PickSection &&
+                currStep.section == StoreSection.FRESHPRODUCTS
+
+        if (isFreshProducts) {
+            showWeighReminder = true
+            return
+        }
+
+        if (callIsLast) {
             viewModel.setNavigationStep(0)
             onFinish()
         } else currentStepIndex++
@@ -217,6 +243,98 @@ fun NavigationScreen(
 
     fun handlePrev() {
         if (currentStepIndex > 0) currentStepIndex--
+    }
+
+    if (showWeighReminder) {
+        AlertDialog(
+            onDismissRequest = {
+                showWeighReminder = false
+                currentStepIndex++
+            },
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text("⚖️ Don't forget to weigh!", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Green800)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("🥦🍎🥕", fontSize = 48.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    Text(
+                        "Please remember to weigh your fresh fruits and vegetables at the weighing station before moving on!",
+                        fontSize = 16.sp,
+                        color = Green800
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showWeighReminder = false
+                        currentStepIndex++
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Green700)
+                ) {
+                    Text("✅ Got it!", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
+    if (showUncheckedReminder) {
+        AlertDialog(
+            onDismissRequest = { showUncheckedReminder = false },
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text("⚠️ Wait! Some items aren't checked", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Green800)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "You might be forgetting these items:",
+                        fontSize = 16.sp,
+                        color = Green800
+                    )
+                    uncheckedItemsList.forEach { itemName ->
+                        Text(
+                            "• $itemName",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Green700
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Do you want to continue anyway?",
+                        fontSize = 15.sp,
+                        color = Color.Gray
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showUncheckedReminder = false
+                        // Check if it's also fresh products to chain the weigh dialog
+                        val currStep = route.getOrNull(currentStepIndex)
+                        if (currStep is RouteStep.PickSection && currStep.section == StoreSection.FRESHPRODUCTS) {
+                            showWeighReminder = true
+                        } else if (currentStepIndex == totalSteps - 1) {
+                            viewModel.setNavigationStep(0)
+                            onFinish()
+                        } else {
+                            currentStepIndex++
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Green700)
+                ) {
+                    Text("Yes, continue", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showUncheckedReminder = false }) {
+                    Text("No, go back", fontSize = 15.sp, color = Green800)
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -384,10 +502,10 @@ private fun StepCard(
             // Title
             Text(
                 text = titleText,
-                fontSize = 34.sp,
+                fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
                 color = Green800,
-                lineHeight = 40.sp,
+                lineHeight = 34.sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -413,9 +531,9 @@ private fun StepCard(
                 Spacer(Modifier.height(16.dp))
                 Text(
                     text = "Items to pick up:",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Green600,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Green800,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(10.dp))
@@ -469,10 +587,20 @@ private fun DirectionBanner(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                Text(
-                    text = direction.emoji,
-                    fontSize = 48.sp,
-                    modifier = Modifier.semantics { contentDescription = direction.label }
+                val isUp = !direction.label.contains("left", ignoreCase = true) &&
+                        !direction.label.contains("right", ignoreCase = true)
+
+                Icon(
+                    imageVector = if (direction.label.contains("left", ignoreCase = true))
+                        Icons.AutoMirrored.Filled.ArrowBack
+                    else
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = direction.label,
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .rotate(if (isUp) -90f else 0f)
+                        .semantics { contentDescription = direction.label }
                 )
                 Text(
                     text = direction.label,
@@ -508,11 +636,11 @@ private fun ActionPill(emoji: String, label: String) {
         modifier = Modifier
             .fillMaxWidth()
             .background(Green100, RoundedCornerShape(99.dp))
-            .padding(horizontal = 20.dp, vertical = 10.dp)
+            .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
-        Text(text = emoji, fontSize = 22.sp)
+        Text(text = emoji, fontSize = 24.sp)
         Spacer(Modifier.width(8.dp))
-        Text(text = label, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Green800)
+        Text(text = label, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Green800)
     }
 }
 

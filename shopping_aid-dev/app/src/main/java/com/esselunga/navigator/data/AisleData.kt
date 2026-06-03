@@ -1165,6 +1165,108 @@ fun searchProducts(query: String): List<Product> {
         .take(5)
 }
 
+// ── Realistic Yuka-style quality scores (1 = bad, 10 = excellent) ─────────
+// Manually curated for popular products. Unknown products default to 5.
+val PRODUCT_SCORES: Map<String, Int> = mapOf(
+    // ✅ Excellent — fresh / organic / whole foods
+    "Esselunga Bio mirtilli biologici 125 g" to 10,
+    "Esselunga Bio meloni biologici " to 9,
+    "Esselunga Bio banane" to 9,
+    "Esselunga Bio 10 Uova fresche 570 g" to 9,
+    "Esselunga Bio 6 Uova fresche medie" to 9,
+    "Esselunga Bio Ceci 400 g" to 9,
+    "Esselunga Bio Rucola 100 g" to 9,
+    "Esselunga Bio Insalatina 150 g" to 9,
+    "Esselunga Bio Misticanza 125 g" to 9,
+    "Esselunga Bio carote biologiche 750 g" to 9,
+    "Esselunga Bio finocchi biologici 600 g" to 9,
+    "Esselunga Bio Pane morbido integrale 400 g" to 8,
+    "Esselunga Bio Passata di pomodoro 700 g" to 9,
+    "Esselunga Bio Aceto di mele 500 ml" to 9,
+    "Esselunga Bio arance Valencia biologiche 1 kg" to 9,
+    "Banane " to 8,
+    "Cirio Olio Extra Vergine di Oliva Classico 1 L" to 8,
+    "Mutti Passata di Pomodoro 700 g" to 8,
+    "Mutti Passata di Pomodoro 400 g" to 8,
+
+    // 👍 Good — light processed, healthy staples
+    "Cirio Passata Rustica 680 g" to 7,
+    "Mutti Polpa di Pomodoro 3 x 400 g" to 7,
+    "Esselunga Latte parzialmente scremato UHT a lunga conservazione 1000 ml" to 7,
+    "Esselunga Bio Yogurt intero bianco 500 g" to 8,
+    "Galbani Santa Lucia Ricotta 250 g" to 7,
+    "Esselunga Bio Hamburger di bovino adulto 200 g" to 7,
+
+    // 🆗 Mid — moderately processed
+    "Barilla Pasta Spaghettini n.3 1Kg" to 6,
+    "Barilla Pasta Fusilli n.98 1Kg" to 6,
+    "Barilla Pasta Mezze Penne Rigate n.70 1Kg" to 6,
+    "Galbani Santa Lucia Mozzarella 125 g" to 6,
+    "Granarolo Mozzarella 4 x 100 g" to 6,
+    "Mulino Bianco Pan Bauletto Integrale Pane ideale per panini 400g" to 6,
+    "Aia Chicken Salad Tagliata di Petti di Pollo 0,300 kg" to 6,
+
+    // 😕 Poor — heavily processed / added sugar
+    "Mulino Bianco Pan Bauletto Bianco Pane Ideale per Panini 400g" to 4,
+    "Mulino Bianco Pan Carrè Pane Ideale per Toast 24 fette 430g" to 4,
+    "Barilla Pesto alla Genovese con Basilico Fresco Condimento e Sugo per Pasta 190 g" to 5,
+    "Barilla Pesto alla Genovese senza Aglio Condimento e Sugo per Pasta 190 g" to 5,
+    "ACTIVIA Fibre Yogurt con Probiotico Bifidus, gusto Avena e Noci, 4x125g" to 5,
+    "Galbani Galbanino Fette Classiche 120 g" to 4,
+    "Galbani Galbanino l'Originale Formaggio Dolce 270 g" to 4,
+    "Aia Semplicemente alla Milanese Cotoletta di Pollo 0,280 kg" to 4,
+    "Aia Spinacine Originali Cotoletta di Pollo e Tacchino con Spinaci 0,200 kg" to 4,
+
+    // 🚫 Very poor — ultra-processed junk / candy
+    "Pringles Original 175 g" to 2,
+    "Kinder bueno 3 x 43 g" to 2,
+    "Kinder Cards 2 pezzi 25,6 g" to 2,
+    "Kinder Cereali 6 x 23,5 g" to 3,
+    "Kinder Maxi 10 x 21 g" to 2,
+    "nutella B-ready 10 x 22 g" to 1,
+    "Magnum White Chocolate Almond 4 Gelati 300 g" to 2,
+    "Magnum Utopia Double Hazelnut 310 g" to 2,
+    "Magnum Crackables Pistachio 311 g" to 2,
+    "NESTLÉ Maxibon Limited Edition Stranger Things 4x61g" to 2,
+    "NESTLÉ Maxibon The Specials Cookie Choco Chips 4x60g" to 2,
+)
+
+/**
+ * Returns the Yuka-style quality score (1-10) for a product.
+ * Returns 5 (neutral) for products not in the curated map.
+ */
+fun getProductScore(product: Product): Int {
+    return PRODUCT_SCORES[product.id] ?: 5
+}
+
+/**
+ * Returns the average price of products in the same category that have a similar
+ * quality score (within [scoreRange] points of [score]).
+ */
+fun getAveragePriceForSimilarScore(
+    categoryId: String,
+    score: Int,
+    scoreRange: Int = 1
+): Double {
+    val similar = PRODUCTS.filter {
+        it.categoryId == categoryId &&
+                kotlin.math.abs(getProductScore(it) - score) <= scoreRange
+    }
+    return if (similar.isEmpty()) 0.0 else similar.map { it.price }.average()
+}
+
+/**
+ * Returns true when the product is more than [marginFraction] above the average
+ * price of products with a similar quality score in the same category.
+ */
+fun isExpensiveForScore(
+    product: Product,
+    marginFraction: Double = 0.20
+): Boolean {
+    val score = getProductScore(product)
+    val avg = getAveragePriceForSimilarScore(product.categoryId, score)
+    return avg > 0.0 && product.price > avg * (1.0 + marginFraction)
+}
 fun getCategoryById(id: String): Category? {
     return CATEGORIES.firstOrNull { it.id == id }
 }
@@ -1195,4 +1297,42 @@ fun getAveragePriceForProductType(categoryId: String, searchQuery: String): Doub
 fun isExpensiveForProductType(productPrice: Double, categoryId: String, searchQuery: String, marginFraction: Double = 0.20): Boolean {
     val avg = getAveragePriceForProductType(categoryId, searchQuery)
     return avg > 0.0 && productPrice > avg * (1.0 + marginFraction)
+}
+
+/**
+ * Returns up to [max] alternative products in the same category that are
+ * better choices than [product] (higher score + cheaper > same score + cheaper >
+ * higher score + slightly pricier but wouldn't trigger expensive warning).
+ */
+fun getSuggestedAlternatives(
+    product: Product,
+    searchQuery: String = "",
+    max: Int = 5
+): List<Product> {
+    val query = searchQuery.trim().lowercase()
+    val sameType = PRODUCTS.filter {
+        it.categoryId == product.categoryId &&
+                it.id != product.id &&
+                (query.length < 2 || it.name.lowercase().contains(query))
+    }
+    val productScore = getProductScore(product)
+
+    val betterAndCheaper = sameType
+        .filter { getProductScore(it) > productScore && it.price < product.price }
+        .sortedWith(compareByDescending<Product> { getProductScore(it) }.thenBy { it.price })
+
+    val sameScoreCheaper = sameType
+        .filter { getProductScore(it) == productScore && it.price < product.price }
+        .sortedBy { it.price }
+
+    val betterButPricier = sameType
+        .filter {
+            val s = getProductScore(it)
+            s > productScore && it.price >= product.price && !isExpensiveForScore(it)
+        }
+        .sortedWith(compareByDescending<Product> { getProductScore(it) }.thenBy { it.price })
+
+    return (betterAndCheaper + sameScoreCheaper + betterButPricier)
+        .distinctBy { it.id }
+        .take(max)
 }

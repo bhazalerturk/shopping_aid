@@ -50,7 +50,11 @@ import com.esselunga.navigator.data.ITALIAN_BASIC_DIET
 import com.esselunga.navigator.data.ListDiff
 import com.esselunga.navigator.data.ItemChange
 import com.esselunga.navigator.data.ItemChangeType
+import com.esselunga.navigator.data.getProductScore
+import com.esselunga.navigator.data.getAveragePriceForSimilarScore
+import com.esselunga.navigator.data.isExpensiveForScore
 import com.esselunga.navigator.data.PRODUCTS
+import com.esselunga.navigator.data.getSuggestedAlternatives
 
 private val EasylungaGreen = Color(0xFF00843D)
 private val WarningYellow = Color(0xFFF9A825)
@@ -99,9 +103,10 @@ fun ListScreen(
     val totalCost by viewModel.totalCost.collectAsState()
     val days by viewModel.wizardDays.collectAsState()
     val people by viewModel.wizardPeople.collectAsState()
-    val wizardActive = days > 1 || people > 1
+    val wizardActive = true
 
     var inputText by remember { mutableStateOf("") }
+    var pendingScore         by remember { mutableStateOf(0) }
     var showExpensiveDialog  by remember { mutableStateOf(false) }
     var pendingProductName   by remember { mutableStateOf("") }
     var pendingProduct       by remember { mutableStateOf<Product?>(null) }
@@ -123,8 +128,8 @@ fun ListScreen(
     var quantityPendingProductName by remember { mutableStateOf("") }
     var quantityPendingProduct    by remember { mutableStateOf<Product?>(null) }
     var quantityPendingIsIncrement by remember { mutableStateOf(false) }
-    val quantityPendingItemId     by remember { mutableStateOf("") }
-    val searchResults = remember(inputText) {
+    var quantityPendingItemId     by remember { mutableStateOf("") }
+    var searchResults = remember(inputText) {
         if (inputText.length >= 2) {
             searchProducts(inputText)
         } else {
@@ -187,10 +192,12 @@ fun ListScreen(
         }
 
         // Check price warning
-        if (product != null && isExpensiveForProductType(product.price, product.categoryId, inputText)) {
+        if (product != null && isExpensiveForScore(product)) {
+            val score = getProductScore(product)
             pendingProductName  = productName
             pendingProduct      = product
-            pendingAvgPrice     = getAveragePriceForProductType(product.categoryId, inputText)
+            pendingScore        = score
+            pendingAvgPrice     = getAveragePriceForSimilarScore(product.categoryId, score)
             pendingCategoryName = getCategoryById(product.categoryId)?.displayName ?: product.categoryId
             showExpensiveDialog = true
         } else {
@@ -199,6 +206,7 @@ fun ListScreen(
         }
     }
     if (showExpensiveDialog) {
+        val alternatives = pendingProduct?.let { getSuggestedAlternatives(it, inputText) } ?: emptyList()
         AlertDialog(
             onDismissRequest = { showExpensiveDialog = false },
             shape = RoundedCornerShape(20.dp),
@@ -208,12 +216,75 @@ fun ListScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        "⚠️ \"$pendingProductName\" is more expensive than similar products.",
+                        "⚠️ \"$pendingProductName\" has a quality score of $pendingScore / 10. It is more expensive than other products with similar quality.",
                         fontSize = 17.sp,
                         fontWeight = FontWeight.SemiBold
                     )
+
+                    if (alternatives.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "🌟 Better choices:",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EasylungaGreen
+                        )
+                        alternatives.forEach { alt ->
+                            val altScore = getProductScore(alt)
+                            val altColor = when {
+                                altScore >= 8 -> Color(0xFF43A047)
+                                altScore >= 5 -> Color(0xFFFBC02D)
+                                else          -> Color(0xFFE53935)
+                            }
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        viewModel.addItemWithProduct(alt)
+                                        inputText = ""
+                                        showExpensiveDialog = false
+                                    },
+                                shape = RoundedCornerShape(10.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(altColor),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("$altScore", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            alt.name,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 2
+                                        )
+                                        Text(
+                                            "${BudgetCalculator.formatEuro(alt.price)}",
+                                            fontSize = 12.sp,
+                                            color = Color.Gray
+                                        )
+                                    }
+                                    Text("➕", fontSize = 18.sp, color = EasylungaGreen)
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(4.dp))
                     Text(
-                        "Do you still want to add it?",
+                        "Do you still want to add the original item?",
                         fontSize = 16.sp
                     )
                 }
@@ -230,7 +301,7 @@ fun ListScreen(
             },
             dismissButton = {
                 OutlinedButton(onClick = { showExpensiveDialog = false }) {
-                    Text("❌ No, go back", fontSize = 15.sp)
+                    Text("❌ No, cancel", fontSize = 15.sp)
                 }
             }
         )
@@ -264,10 +335,12 @@ fun ListScreen(
                             viewModel.incrementQuantity(quantityPendingItemId)
                         } else {
                             val product = quantityPendingProduct
-                            if (product != null && isExpensiveForProductType(product.price, product.categoryId, inputText)) {
+                            if (product != null && isExpensiveForScore(product)) {
+                                val score = getProductScore(product)
                                 pendingProductName = quantityPendingProductName
                                 pendingProduct = product
-                                pendingAvgPrice = getAveragePriceForProductType(product.categoryId, inputText)
+                                pendingScore = score
+                                pendingAvgPrice = getAveragePriceForSimilarScore(product.categoryId, score)
                                 pendingCategoryName = getCategoryById(product.categoryId)?.displayName ?: product.categoryId
                                 showExpensiveDialog = true
                             } else {
@@ -329,10 +402,12 @@ fun ListScreen(
                                 return@Button
                             }
                         }
-                        if (product != null && isExpensiveForProductType(product.price, product.categoryId, inputText)) {
+                        if (product != null && isExpensiveForScore(product)) {
+                            val score = getProductScore(product)
                             pendingProductName = budgetWarningProductName
                             pendingProduct = product
-                            pendingAvgPrice = getAveragePriceForProductType(product.categoryId, inputText)
+                            pendingScore = score
+                            pendingAvgPrice = getAveragePriceForSimilarScore(product.categoryId, score)
                             pendingCategoryName = getCategoryById(product.categoryId)?.displayName ?: product.categoryId
                             showExpensiveDialog = true
                         } else {
@@ -614,6 +689,24 @@ fun ListScreen(
                                     .split(" ").take(2).joinToString(" ")
                                     .replaceFirstChar { it.uppercase() }
 
+// Quality score badge (Yuka-style)
+                                val score = getProductScore(product)
+                                val scoreColor = when {
+                                    score >= 8 -> Color(0xFF43A047)  // green
+                                    score >= 5 -> Color(0xFFFBC02D)  // yellow
+                                    else       -> Color(0xFFE53935)  // red
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(scoreColor),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("$score", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                }
+                                Spacer(Modifier.width(8.dp))
+
                                 Text(
                                     text = shortName,
                                     fontSize = 19.sp,
@@ -622,6 +715,14 @@ fun ListScreen(
                                     maxLines = 1,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                     modifier = Modifier.weight(1f)
+                                )
+
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = BudgetCalculator.formatEuro(product.price),
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = EasylungaGreen
                                 )
 
                                 IconButton(
@@ -817,7 +918,18 @@ fun ListScreen(
                                     )
                                 }
                             } else {
-                                viewModel.incrementQuantity(item.id)
+                                val product = item.product
+                                val suggestedQty = product?.let { viewModel.getSuggestedQuantity(it) }
+                                if (wizardActive && product != null && product.suggestedPerDay > 0 && suggestedQty != null && item.quantity + 1 > suggestedQty) {
+                                    quantityWarningName = item.rawText
+                                    quantityWarningRecommended = suggestedQty
+                                    quantityWarningCurrent = item.quantity
+                                    quantityPendingIsIncrement = true
+                                    quantityPendingItemId = item.id
+                                    showQuantityWarning = true
+                                } else {
+                                    viewModel.incrementQuantity(item.id)
+                                }
                             }
                         },
                         onDecrement = { viewModel.decrementQuantity(item.id) },
@@ -951,13 +1063,14 @@ private fun ShoppingItemRow(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(20.dp)
                     ) {
-                        OutlinedIconButton(
-                            onClick = onDecrement,
-                            modifier = Modifier.size(48.dp),
-                            enabled = item.quantity > 1,
-                            border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.5.dp)
-                        ) {
-                            Text("−", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = color)
+                        if (item.quantity > 1) {
+                            OutlinedIconButton(
+                                onClick = onDecrement,
+                                modifier = Modifier.size(34.dp),
+                                border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.5.dp)
+                            ) {
+                                Text("−", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = color)
+                            }
                         }
                         Text(
                             text = "${item.quantity}",
@@ -1047,13 +1160,19 @@ private fun ShoppingItemRow(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 OutlinedIconButton(
-                    onClick = onDecrement,
-                    modifier = Modifier.size(30.dp),
-                    enabled = item.quantity > 1,
-                    border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp)
+                    onClick = {
+                        if (item.quantity > 1) {
+                            onDecrement()
+                        } else {
+                            onRemove()
+                        }
+                    },
+                    modifier = Modifier.size(34.dp),
+                    border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.5.dp)
                 ) {
-                    Text("−", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = EasylungaGreen)
+                    Text("−", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = EasylungaGreen)
                 }
+
                 Text(
                     "${item.quantity}",
                     fontSize = 17.sp,
@@ -1089,13 +1208,13 @@ private fun ShoppingItemRow(
         // Remove button
         IconButton(
             onClick = onRemove,
-            modifier = Modifier.size(30.dp)
+            modifier = Modifier.size(40.dp)
         ) {
             Icon(
                 Icons.Default.Close,
                 contentDescription = "Remove $shortName",
-                tint = Color.LightGray,
-                modifier = Modifier.size(16.dp)
+                tint = Color.DarkGray,
+                modifier = Modifier.size(26.dp)
             )
         }
     }

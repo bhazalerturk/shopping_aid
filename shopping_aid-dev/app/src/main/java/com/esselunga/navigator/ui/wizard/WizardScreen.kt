@@ -69,29 +69,29 @@ fun WizardScreen(
         Spacer(Modifier.height(16.dp))
 
         when (step) {
-            0 -> BudgetStep(
+            0 -> ListStep(
+                onNext = { step = 1 }
+            )
+            1 -> BudgetStep(
                 budget   = budget,
                 onChange = { budget = it },
-                onNext   = { viewModel.setBudget(budget.toDouble()); step = 1 },
-                onSkip   = { step = 1 }
+                onNext   = { viewModel.setBudget(budget.toDouble()); step = 2 },
+                onBack   = { step = 0 },
+                onSkip   = { step = 2 }
             )
-            1 -> DaysStep(
+            2 -> DaysStep(
                 selectedDays = days,
                 onSelect     = { viewModel.setWizardDays(it) },
-                onNext       = { step = 2 },
-                onBack       = { step = 0 },
-                onSkip       = { step = 2 }
+                onNext       = { step = 3 },
+                onBack       = { step = 1 },
+                onSkip       = { step = 3 }
             )
-            2 -> PeopleStep(
+            3 -> PeopleStep(
                 selectedPeople = people,
                 onSelect       = { viewModel.setWizardPeople(it) },
-                onNext         = { step = 3 },
-                onBack         = { step = 1 },
-                onSkip         = { step = 3 }
-            )
-            3 -> ListStep(
-                onNext = onDone,
-                onBack = { step = 2 }
+                onNext         = onDone,
+                onBack         = { step = 2 },
+                onSkip         = onDone
             )
         }
     }
@@ -153,187 +153,12 @@ private fun WizardNav(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Step 0 — Budget
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun BudgetStep(
-    budget:   Int,
-    onChange: (Int) -> Unit,
-    onNext:   () -> Unit,
-    onSkip:   () -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.SpaceBetween
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("💶", fontSize = 64.sp)
-            Spacer(Modifier.height(12.dp))
-            Text(
-                "How much do you want to spend?",
-                fontSize = 26.sp, fontWeight = FontWeight.Bold,
-                color = Green, textAlign = TextAlign.Center
-            )
-        }
-
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                "€$budget",
-                fontSize = 64.sp,
-                fontWeight = FontWeight.Bold,
-                color = Green800
-            )
-            Spacer(Modifier.height(8.dp))
-            Slider(
-                value         = budget.toFloat(),
-                onValueChange = { onChange(it.toInt()) },
-                valueRange    = 1f..100f,
-                steps         = 98,
-                modifier      = Modifier.fillMaxWidth(),
-                colors        = SliderDefaults.colors(
-                    thumbColor          = Green,
-                    activeTrackColor    = Green,
-                    inactiveTrackColor  = Color.LightGray
-                )
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("€1", fontSize = 13.sp, color = Color.Gray)
-                Text("€100", fontSize = 13.sp, color = Color.Gray)
-            }
-        }
-
-        WizardNav(onNext = onNext, onSkip = onSkip)
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 1 — Days
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun DaysStep(
-    selectedDays: Int,
-    onSelect: (Int) -> Unit,
-    onNext:   () -> Unit,
-    onBack:   () -> Unit,
-    onSkip:   () -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.SpaceBetween
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("📅", fontSize = 64.sp)
-            Spacer(Modifier.height(12.dp))
-            Text(
-                "For how many days?",
-                fontSize = 26.sp, fontWeight = FontWeight.Bold,
-                color = Green, textAlign = TextAlign.Center
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "I am shopping for...",
-                fontSize = 16.sp, color = Color.Gray, textAlign = TextAlign.Center
-            )
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            listOf(1 to "1 day", 3 to "2–3 days", 7 to "A week").forEach { (d, label) ->
-                Button(
-                    onClick  = { onSelect(d) },
-                    modifier = Modifier.fillMaxWidth().height(64.dp),
-                    colors   = ButtonDefaults.buttonColors(
-                        containerColor = if (selectedDays == d) Green else Color.White,
-                        contentColor   = if (selectedDays == d) Color.White else Green
-                    ),
-                    shape     = RoundedCornerShape(14.dp),
-                    elevation = ButtonDefaults.buttonElevation(2.dp)
-                ) {
-                    Text(label, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
-
-        WizardNav(onBack = onBack, onNext = onNext, onSkip = onSkip)
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 2 — People
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun PeopleStep(
-    selectedPeople: Int,
-    onSelect: (Int) -> Unit,
-    onNext:   () -> Unit,
-    onBack:   () -> Unit,
-    onSkip:   () -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.SpaceBetween
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("👥", fontSize = 64.sp)
-            Spacer(Modifier.height(12.dp))
-            Text(
-                "For how many people?",
-                fontSize = 26.sp, fontWeight = FontWeight.Bold,
-                color = Green, textAlign = TextAlign.Center
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "I am shopping for...",
-                fontSize = 16.sp, color = Color.Gray, textAlign = TextAlign.Center
-            )
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            listOf(1 to "Just me", 2 to "2 people", 3 to "3 people", 4 to "4+ people").forEach { (p, label) ->
-                Button(
-                    onClick  = { onSelect(p) },
-                    modifier = Modifier.fillMaxWidth().height(64.dp),
-                    colors   = ButtonDefaults.buttonColors(
-                        containerColor = if (selectedPeople == p) Green else Color.White,
-                        contentColor   = if (selectedPeople == p) Color.White else Green
-                    ),
-                    shape     = RoundedCornerShape(14.dp),
-                    elevation = ButtonDefaults.buttonElevation(2.dp)
-                ) {
-                    Text(label, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
-
-        WizardNav(onBack = onBack, onNext = onNext, onSkip = onSkip)
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 3 — List creation
+// Step 0 — List creation (FIRST STEP NOW)
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun ListStep(
-    onNext: () -> Unit,
-    onBack: () -> Unit
+    onNext: () -> Unit
 ) {
     var showSendLinkDialog by remember { mutableStateOf(false) }
 
@@ -393,7 +218,182 @@ private fun ListStep(
             }
         }
 
-        WizardNav(onBack = onBack, onNext = onNext, nextLabel = "Done ✓")
+        WizardNav(onNext = onNext)
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 1 — Budget
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun BudgetStep(
+    budget:   Int,
+    onChange: (Int) -> Unit,
+    onNext:   () -> Unit,
+    onBack:   () -> Unit,
+    onSkip:   () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("💶", fontSize = 64.sp)
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "How much do you want to spend?",
+                fontSize = 26.sp, fontWeight = FontWeight.Bold,
+                color = Green, textAlign = TextAlign.Center
+            )
+        }
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                "€$budget",
+                fontSize = 64.sp,
+                fontWeight = FontWeight.Bold,
+                color = Green800
+            )
+            Spacer(Modifier.height(8.dp))
+            Slider(
+                value         = budget.toFloat(),
+                onValueChange = { onChange(it.toInt()) },
+                valueRange    = 1f..100f,
+                steps         = 98,
+                modifier      = Modifier.fillMaxWidth(),
+                colors        = SliderDefaults.colors(
+                    thumbColor          = Green,
+                    activeTrackColor    = Green,
+                    inactiveTrackColor  = Color.LightGray
+                )
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("€1", fontSize = 13.sp, color = Color.Gray)
+                Text("€100", fontSize = 13.sp, color = Color.Gray)
+            }
+        }
+
+        WizardNav(onBack = onBack, onNext = onNext, onSkip = onSkip)
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 2 — Days
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun DaysStep(
+    selectedDays: Int,
+    onSelect: (Int) -> Unit,
+    onNext:   () -> Unit,
+    onBack:   () -> Unit,
+    onSkip:   () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("📅", fontSize = 64.sp)
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "For how many days?",
+                fontSize = 26.sp, fontWeight = FontWeight.Bold,
+                color = Green, textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "I am shopping for...",
+                fontSize = 16.sp, color = Color.Gray, textAlign = TextAlign.Center
+            )
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            listOf(1 to "1 day", 3 to "2–3 days", 7 to "A week").forEach { (d, label) ->
+                Button(
+                    onClick  = { onSelect(d) },
+                    modifier = Modifier.fillMaxWidth().height(64.dp),
+                    colors   = ButtonDefaults.buttonColors(
+                        containerColor = if (selectedDays == d) Green else Color.White,
+                        contentColor   = if (selectedDays == d) Color.White else Green
+                    ),
+                    shape     = RoundedCornerShape(14.dp),
+                    elevation = ButtonDefaults.buttonElevation(2.dp)
+                ) {
+                    Text(label, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+
+        WizardNav(onBack = onBack, onNext = onNext, onSkip = onSkip)
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 3 — People (LAST STEP NOW)
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun PeopleStep(
+    selectedPeople: Int,
+    onSelect: (Int) -> Unit,
+    onNext:   () -> Unit,
+    onBack:   () -> Unit,
+    onSkip:   () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("👥", fontSize = 64.sp)
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "For how many people?",
+                fontSize = 26.sp, fontWeight = FontWeight.Bold,
+                color = Green, textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "I am shopping for...",
+                fontSize = 16.sp, color = Color.Gray, textAlign = TextAlign.Center
+            )
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            listOf(1 to "Just me", 2 to "2 people", 3 to "3 people", 4 to "4+ people").forEach { (p, label) ->
+                Button(
+                    onClick  = { onSelect(p) },
+                    modifier = Modifier.fillMaxWidth().height(64.dp),
+                    colors   = ButtonDefaults.buttonColors(
+                        containerColor = if (selectedPeople == p) Green else Color.White,
+                        contentColor   = if (selectedPeople == p) Color.White else Green
+                    ),
+                    shape     = RoundedCornerShape(14.dp),
+                    elevation = ButtonDefaults.buttonElevation(2.dp)
+                ) {
+                    Text(label, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+
+        WizardNav(onBack = onBack, onNext = onNext, onSkip = onSkip, nextLabel = "Done ✓")
     }
 }
 
