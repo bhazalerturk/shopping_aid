@@ -84,8 +84,8 @@ private data class StepMeta(
 private fun metaFor(step: RouteStep): StepMeta = when (step) {
     is RouteStep.EnterSection  -> StepMeta("🚶", "Get to section",     Icons.AutoMirrored.Filled.ArrowForward)
     is RouteStep.PassThrough   -> StepMeta("🚶", "Walk through",       Icons.AutoMirrored.Filled.ArrowForward)
-    is RouteStep.PickSection   -> StepMeta("🛒", "Pick up items here", Icons.Default.ShoppingCart)
-    is RouteStep.PickItem      -> StepMeta("🛒", "Pick up items here", Icons.Default.ShoppingCart)
+    is RouteStep.PickSection   -> StepMeta("🛒", "Pick up items in", Icons.Default.ShoppingCart)
+    is RouteStep.PickItem      -> StepMeta("🛒", "Pick up items in", Icons.Default.ShoppingCart)
     is RouteStep.GoToCheckout  -> StepMeta("💳", "Head to checkout",   Icons.Default.ShoppingCart, Color.White, Green200)
     is RouteStep.AskStaff      -> StepMeta("🙋", "Ask a staff member", Icons.Default.Person)
     is RouteStep.Finish        -> StepMeta("🎉", "End of the route",   Icons.Default.CheckCircle,  Color.White, Green200)
@@ -484,8 +484,15 @@ private fun StepCard(
             }
 
             // Action pill
-            ActionPill(emoji = meta.actionEmoji, label = meta.actionLabel)
-            Spacer(Modifier.height(20.dp))
+            Text(
+                text = meta.actionLabel,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                color = Green800,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(12.dp))
 
             // Big emoji
             val bigEmoji = sectionDisplay?.emoji ?: when (step) {
