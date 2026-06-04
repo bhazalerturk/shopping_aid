@@ -1,9 +1,10 @@
 package com.esselunga.navigator.ui.review
-
+//holaaaaaaaaaaaaaaaaaa
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Share
@@ -14,13 +15,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.esselunga.navigator.util.BudgetCalculator
 import com.esselunga.navigator.viewmodel.ShoppingViewModel
-import com.esselunga.navigator.util.BudgetCalculator.totalCost
-
-
 
 private val EasylungaGreen = Color(0xFF00843D)
 
@@ -30,7 +29,7 @@ fun ReviewScreen(
     viewModel: ShoppingViewModel,
     onBack: () -> Unit,
     onGoShopping: () -> Unit,
-    onOpenCaregiverInterface: (listId: String) -> Unit
+    onOpenCaregiverInterface: (listId: String) -> Unit = {}
 ) {
     val items by viewModel.items.collectAsState()
     val budget by viewModel.budget.collectAsState()
@@ -39,6 +38,8 @@ fun ReviewScreen(
     val context = LocalContext.current
 
     var showCaregiverSetup by remember { mutableStateOf(false) }
+    var caregiverName by remember { mutableStateOf(caregiver?.name ?: "") }
+    var caregiverPhone by remember { mutableStateOf(caregiver?.phoneNumber ?: "") }
 
     Scaffold(
         topBar = {
@@ -99,60 +100,90 @@ fun ReviewScreen(
                 ) {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("Share with caregiver", fontSize = 17.sp, fontWeight = FontWeight.Bold)
-
-                        Text("${caregiver!!.name} · ${caregiver!!.phoneNumber}", fontSize = 14.sp, color = Color.Gray)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Button(
-                                onClick = {
-                                    val listId = "current"
-                                    val shareLink = "shoppingaid://caregiver-list?listId=$listId"
-                                    val shareText = "Click here to help me making mi shopping list:\n$shareLink"
-                                    val sendIntent = android.content.Intent().apply {
-                                        action = android.content.Intent.ACTION_SEND
-                                        putExtra(android.content.Intent.EXTRA_TEXT, shareText)
-                                        type = "text/plain"
-                                    }
-                                    context.startActivity(android.content.Intent.createChooser(sendIntent, "Share Link"))
-                                },
-                                modifier = Modifier.weight(1f).height(50.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = EasylungaGreen),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Icon(Icons.Default.Share, contentDescription = null)
-                                Spacer(Modifier.width(6.dp))
-                                Text("Send Link", fontSize = 15.sp)
+                        if (caregiver != null) {
+                            Text("${caregiver!!.name} · ${caregiver!!.phoneNumber}", fontSize = 14.sp, color = Color.Gray)
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Button(
+                                    onClick = {
+                                        val listId = "current"
+                                        val shareLink = "shoppingaid://caregiver-list?listId=$listId"
+                                        val shareText = "Click here to help me create my shopping list:\n$shareLink"
+                                        val sendIntent = android.content.Intent().apply {
+                                            action = android.content.Intent.ACTION_SEND
+                                            putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                                            type = "text/plain"
+                                        }
+                                        context.startActivity(android.content.Intent.createChooser(sendIntent, "Share Link"))
+                                    },
+                                    modifier = Modifier.weight(1f).height(50.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = EasylungaGreen),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Default.Share, contentDescription = null)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Send Link", fontSize = 15.sp)
+                                }
+                                OutlinedButton(
+                                    onClick = { showCaregiverSetup = !showCaregiverSetup },
+                                    modifier = Modifier.height(50.dp),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Edit", fontSize = 15.sp)
+                                }
                             }
-                            OutlinedButton(
-                                onClick = { showCaregiverSetup = !showCaregiverSetup },
-                                modifier = Modifier.height(50.dp),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Text("Edit", fontSize = 15.sp)
-                            }
-                        }
-
-                        // Provisional button to access caregiver interface, will be replaced by the link in the future
-
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
+                        } else {
+                            Text("No caregiver configured.", fontSize = 14.sp, color = Color.Gray)
                             Button(
-                                onClick = {
-                                    val listId = "current"
-                                    viewModel.saveOriginalListIfNeeded()
-                                    onOpenCaregiverInterface(listId)},
+                                onClick = { showCaregiverSetup = true },
                                 modifier = Modifier.fillMaxWidth().height(50.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = EasylungaGreen),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8F5E9), contentColor = EasylungaGreen),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("(Trial) Open caregiver interface", fontSize = 15.sp)
+                                Text("+ Add caregiver", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
 
+                        if (showCaregiverSetup) {
+                            OutlinedTextField(
+                                value = caregiverName,
+                                onValueChange = { caregiverName = it },
+                                label = { Text("Caregiver name") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            OutlinedTextField(
+                                value = caregiverPhone,
+                                onValueChange = { caregiverPhone = it },
+                                label = { Text("Phone number") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            Button(
+                                onClick = {
+                                    if (caregiverName.isNotBlank() && caregiverPhone.isNotBlank()) {
+                                        viewModel.setCaregiverContact(caregiverName, caregiverPhone)
+                                        showCaregiverSetup = false
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = EasylungaGreen),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Save Caregiver", fontSize = 15.sp)
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { onOpenCaregiverInterface("current") },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = EasylungaGreen),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("(Trial) Open caregiver interface", fontSize = 15.sp)
+                        }
                     }
                 }
             }
@@ -173,9 +204,6 @@ fun ReviewScreen(
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(item.rawText, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                            item.product?.let { cat ->
-                                Text("Aisle ${null} · ${null}", fontSize = 12.sp, color = EasylungaGreen)
-                            }
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             Text("x${item.quantity}", fontSize = 13.sp, color = Color.Gray)
